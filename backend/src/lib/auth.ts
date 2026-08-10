@@ -50,10 +50,24 @@ export function isAuthorized(opts: {
   return false;
 }
 
-/** A 401 with no detail — never hint at why the secret was rejected. */
-export function unauthorized(): Response {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-    status: 401,
+/**
+ * Rejects an unauthenticated request as 404, not 401.
+ *
+ * This is deliberate and it matters. Under the MCP spec, a 401 means "this server uses
+ * OAuth" — clients are expected to read the WWW-Authenticate header, discover an
+ * authorization server, and register themselves. Claude's connector does exactly that: a
+ * 401 makes it try dynamic client registration, which fails with a confusing
+ * "Couldn't register with this server's sign-in service" error that says nothing about
+ * the actual problem (a wrong or missing secret).
+ *
+ * This server has no OAuth and never will — it's one user with one shared secret. Since
+ * the secret IS the URL, a request without the right one is genuinely a request for a
+ * resource that doesn't exist, so 404 is both honest and unambiguous. It also avoids
+ * confirming to a stranger that anything is mounted here.
+ */
+export function rejected(): Response {
+  return new Response(JSON.stringify({ error: 'Not found' }), {
+    status: 404,
     headers: { 'content-type': 'application/json' },
   });
 }

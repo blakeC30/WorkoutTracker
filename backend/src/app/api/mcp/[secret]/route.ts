@@ -1,4 +1,4 @@
-import { isAuthorized, unauthorized } from '@/lib/auth';
+import { isAuthorized, rejected } from '@/lib/auth';
 import { mcpHandler } from '@/lib/mcp';
 
 /**
@@ -28,7 +28,7 @@ async function handle(
   const { secret } = await params;
 
   if (!isAuthorized({ pathSecret: secret, request })) {
-    return unauthorized();
+    return rejected();
   }
 
   return mcpHandler(request);

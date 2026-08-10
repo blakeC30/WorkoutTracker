@@ -1,4 +1,4 @@
-import { isAuthorized, unauthorized } from '@/lib/auth';
+import { isAuthorized, rejected } from '@/lib/auth';
 import { mcpHandler } from '@/lib/mcp';
 
 /**
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 async function handle(request: Request): Promise<Response> {
   if (!isAuthorized({ request })) {
-    return unauthorized();
+    return rejected();
   }
   return mcpHandler(request);
 }
