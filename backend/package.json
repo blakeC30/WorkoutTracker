@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -22,7 +22,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/ws": "^8.18.1",
