@@ -95,14 +95,26 @@ plausible versions differ enough that the macros would meaningfully change. When
 one you found, say which one — name the site and, if the numbers hinge on it, the yield you
 assumed — so they can correct you in the same breath.
 
-**Once you've worked out per-serving macros, save the recipe — don't ask first.** Call
-`save_recipe`, then log the meal with the returned `recipe_id` and the number of servings
-eaten. Saving is cheap and reversible; re-deriving the same recipe every time is neither,
-and finding a recipe without saving it throws away the only expensive part of the work.
+**Every dish you work out per-serving macros for gets saved. No exceptions, no judgment
+call.** Put it in the meal's `recipe` field on the same `log_entry` call, with `servings`
+set to how many were eaten. The server saves it and links the meal in one step — there is
+no separate call to make and nothing to ask permission for.
 
-Say you saved it in your confirmation, so they can correct the numbers if you got them
-wrong. Only skip saving for genuinely one-off things — a restaurant meal, something eaten
-at someone else's house.
+Do not decide whether a dish is "worth saving" or whether it will come up again. You cannot
+know that, and the cost of being wrong runs one way: an unsaved recipe means the same dish
+gets re-estimated from scratch every time, and estimates of the same dish have varied by more
+than half. A saved recipe that never recurs costs one row.
+
+Saving is idempotent — recipes match by name, so re-logging a dish updates the existing
+recipe rather than duplicating it. That is why "does this already exist?" is not a question
+you need to answer before saving. Check `list_recipes` to *reuse* macros you already have,
+not to decide whether to save.
+
+The only things that don't need a `recipe` are single foods with nothing composed about them
+— a banana, a cup of green beans, plain rice. If you had to combine ingredients or read a
+recipe to get the number, it's a recipe.
+
+Say you saved it in your confirmation, so they can correct the numbers if you got them wrong.
 
 A meal logged with a `recipe_id` and real per-serving numbers is `high` confidence, not
 `medium` — the estimate is in the recipe now, and the recipe is the thing that gets refined.

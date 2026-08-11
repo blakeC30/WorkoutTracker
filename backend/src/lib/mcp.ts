@@ -187,12 +187,14 @@ export const mcpHandler = createMcpHandler(
       'meal. Set meal_type on every meal row.\n\n' +
       'Before estimating macros for a dish, call list_recipes. If it is saved, use its ' +
       'macros and recipe_id instead of guessing.\n\n' +
-      'If it is not saved and you work out per-serving macros for it, put them in the ' +
-      'meal\'s `recipe` field when you call log_entry, with `servings` set to how many were ' +
-      'eaten. The server saves the recipe and links the meal in one step — no separate ' +
-      'save_recipe call is needed. Deriving a recipe without recording it means the same ' +
-      'dish gets re-estimated every time, and estimates of the same dish have varied by ' +
-      'more than half.\n\n' +
+      'EVERY dish you work out per-serving macros for gets a `recipe` on its meal, with ' +
+      '`servings` set to how many were eaten. No exceptions and no judgment about whether ' +
+      'it is worth saving or will recur — you cannot know that, and an unsaved recipe means ' +
+      'the dish is re-estimated from scratch every time (the same dish has varied by more ' +
+      'than half between estimates). Saving matches by name and is idempotent, so re-logging ' +
+      'a dish updates its recipe rather than duplicating it. The server saves and links it ' +
+      'in the same call — there is no separate save_recipe step. Only plain single foods ' +
+      '(a banana, a cup of green beans) need no recipe.\n\n' +
       'For cardio, always record distance_mi when a distance is mentioned.',
   },
 );
