@@ -34,7 +34,8 @@ export type LogEntryResult = {
   meals: Array<{
     description: string;
     entry_date: string;
-    recipe?: { id: number; name: string; created: boolean };
+    servings: number;
+    food?: { id: number; name: string; created: boolean };
   }>;
 };
 
@@ -120,74 +121,75 @@ export async function logEntry(
 
     const meals: LogEntryResult['meals'] = [];
     for (const m of input.meals ?? []) {
-      let recipeId = m.recipe_id ?? null;
-      let savedRecipe: { id: number; name: string; created: boolean } | undefined;
+      let foodId = m.food_id ?? null;
+      let savedFood: { id: number; name: string; created: boolean } | undefined;
 
-      // A recipe supplied inline is saved here, in the same transaction as the meal, so
-      // logging a dish from a recipe is a single tool call. Matching is by name, so
-      // cooking the same dish again updates that recipe rather than duplicating it.
-      if (m.recipe) {
-        const r = m.recipe;
+      // A food supplied inline is upserted here, in the same transaction as the meal, so
+      // cataloguing a new food is never a separate call. Matching is by name, so eating the
+      // same thing again updates that food rather than duplicating it.
+      if (m.food) {
+        const f = m.food;
         const { rows } = await client.query<{ id: string; name: string; created: boolean }>(
-          `insert into recipes
-             (name, source_url, servings, calories, protein_g, carbs_g, fat_g, notes)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)
+          `insert into foods
+             (name, unit_label, calories, protein_g, carbs_g, fat_g, aliases, source_url,
+              confidence, notes)
+           values ($1, coalesce($2,'serving'), $3, $4, $5, $6, coalesce($7,'{}'), $8, $9, $10)
            on conflict (name) do update set
-             source_url = coalesce(excluded.source_url, recipes.source_url),
-             servings   = coalesce(excluded.servings,   recipes.servings),
-             calories   = coalesce(excluded.calories,   recipes.calories),
-             protein_g  = coalesce(excluded.protein_g,  recipes.protein_g),
-             carbs_g    = coalesce(excluded.carbs_g,    recipes.carbs_g),
-             fat_g      = coalesce(excluded.fat_g,      recipes.fat_g),
-             notes      = coalesce(excluded.notes,      recipes.notes),
+             unit_label = coalesce(excluded.unit_label, foods.unit_label),
+             calories   = coalesce(excluded.calories,   foods.calories),
+             protein_g  = coalesce(excluded.protein_g,  foods.protein_g),
+             carbs_g    = coalesce(excluded.carbs_g,    foods.carbs_g),
+             fat_g      = coalesce(excluded.fat_g,      foods.fat_g),
+             -- union the alias lists so a shortcut learned once is never lost
+             aliases    = (select coalesce(array_agg(distinct a), '{}')
+                           from unnest(foods.aliases || excluded.aliases) a),
+             source_url = coalesce(excluded.source_url, foods.source_url),
+             confidence = coalesce(excluded.confidence, foods.confidence),
+             notes      = coalesce(excluded.notes,      foods.notes),
              updated_at = now()
            returning id, name, (xmax = 0) as created`,
           [
-            r.name.trim(), r.source_url ?? null, r.yields_servings ?? null,
-            r.calories ?? null, r.protein_g ?? null, r.carbs_g ?? null,
-            r.fat_g ?? null, r.notes ?? null,
+            f.name.trim(), f.unit_label ?? null, f.calories ?? null, f.protein_g ?? null,
+            f.carbs_g ?? null, f.fat_g ?? null, f.aliases ?? null, f.source_url ?? null,
+            f.confidence ?? null, f.notes ?? null,
           ],
         );
-        recipeId = Number(rows[0].id);
-        savedRecipe = {
-          id: recipeId,
-          name: rows[0].name,
-          created: rows[0].created,
-        };
+        foodId = Number(rows[0].id);
+        savedFood = { id: foodId, name: rows[0].name, created: rows[0].created };
       }
 
-      // Macros are derived from the recipe only when the model did not supply them, and the
-      // result is COPIED onto the row. Nothing is read back through recipe_id later, so
-      // refining a recipe never rewrites a meal already eaten.
-      const eaten = m.servings ?? 1;
-      const perServing = m.recipe;
-      const derive = (own: number | undefined, per: number | undefined) =>
-        own ?? (perServing && per !== undefined ? Math.round(per * eaten) : null);
+      if (foodId === null) {
+        throw new Error(
+          `Meal "${m.note ?? m.entry_date}" has neither food_id nor food. Every meal must ` +
+            'point at a food — search_foods first, and supply a food if nothing matches.',
+        );
+      }
 
-      const calories = derive(m.calories, perServing?.calories);
-      const protein = derive(m.protein_g, perServing?.protein_g);
-      const carbs = derive(m.carbs_g, perServing?.carbs_g);
-      const fat = derive(m.fat_g, perServing?.fat_g);
+      // Look up the name when the meal referenced an existing food, so the confirmation
+      // reads "2 x Nobu miso black cod" rather than "2 x food #2" — the confirmation is the
+      // moment a wrong food id is cheap to catch.
+      let foodName = savedFood?.name;
+      if (!foodName) {
+        const { rows } = await client.query<{ name: string }>(
+          'select name from foods where id = $1',
+          [foodId],
+        );
+        foodName = rows[0]?.name ?? `food #${foodId}`;
+      }
 
-      // A row whose macros came from a recipe is high confidence by definition — the
-      // estimate now lives in the recipe, which is the thing that gets refined. Defaulting
-      // it here rather than asking the model to remember: it left confidence null on every
-      // recipe-linked row even with the rule stated in the prompt.
-      const confidence = m.confidence ?? (recipeId !== null ? 'high' : null);
-
-      // No uniqueness constraint on meals — several meals a day is normal.
+      // Macros are deliberately absent here. They live on the food and are read through the
+      // join, so correcting a food corrects every meal already logged with it.
       await client.query(
-        `insert into meals
-           (journal_id, entry_date, meal_type, description, recipe_id, servings,
-            calories, protein_g, carbs_g, fat_g, confidence)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          journalId, m.entry_date, m.meal_type ?? null, m.description,
-          recipeId, m.servings ?? null, calories, protein, carbs, fat,
-          confidence,
-        ],
+        `insert into meals (journal_id, entry_date, meal_type, food_id, servings, note)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [journalId, m.entry_date, m.meal_type ?? null, foodId, m.servings ?? 1, m.note ?? null],
       );
-      meals.push({ description: m.description, entry_date: m.entry_date, recipe: savedRecipe });
+      meals.push({
+        description: foodName,
+        entry_date: m.entry_date,
+        servings: m.servings ?? 1,
+        food: savedFood,
+      });
     }
 
     await client.query('commit');
@@ -213,11 +215,16 @@ export async function getRecentHistory(days: number) {
         from bodyweight
         where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc`,
-    sql`select entry_date::text as entry_date, meal_type, description, recipe_id, servings,
-               calories, protein_g, carbs_g, fat_g, confidence
-        from meals
-        where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
-        order by entry_date desc`,
+    sql`select m.entry_date::text as entry_date, m.meal_type, f.name as food,
+               f.unit_label, m.servings, m.note,
+               round(f.calories  * m.servings) as calories,
+               round(f.protein_g * m.servings) as protein_g,
+               round(f.carbs_g   * m.servings) as carbs_g,
+               round(f.fat_g     * m.servings) as fat_g,
+               f.confidence
+        from meals m join foods f on f.id = m.food_id
+        where m.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+        order by m.entry_date desc, m.id`,
   ]);
 
   return { days, workouts, bodyweight, meals };
@@ -252,8 +259,10 @@ export async function describeJournal(journalId: number) {
                duration_min, distance_mi
         from workouts where journal_id = ${journalId} order by exercise`,
     sql`select entry_date::text as entry_date, weight_lbs from bodyweight where journal_id = ${journalId}`,
-    sql`select entry_date::text as entry_date, meal_type, description, calories
-        from meals where journal_id = ${journalId} order by id`,
+    sql`select m.entry_date::text as entry_date, m.meal_type, f.name as description,
+               m.servings, round(f.calories * m.servings) as calories
+        from meals m join foods f on f.id = m.food_id
+        where m.journal_id = ${journalId} order by m.id`,
   ]);
 
   return { journal, workouts, bodyweight, meals };
@@ -267,50 +276,89 @@ export async function deleteJournal(journalId: number): Promise<boolean> {
 }
 
 /**
- * Saves a recipe, or updates it if the name already exists.
+ * Fuzzy food search.
  *
- * Macros stored here are PER SERVING. They are copied onto a meal row when the meal is
- * logged and never read back through the link — refining a recipe changes what gets logged
- * next, not what was already eaten.
+ * Ranks by the best of three signals so short names find long ones: an exact alias match, a
+ * substring match, and trigram similarity for typos. "black cod", "cod" and "blak cod" all
+ * reach "nobu miso black cod". pg_trgm backs the similarity with a GIN index.
  */
-export async function saveRecipe(input: {
+export async function searchFoods(query?: string, limit = 10) {
+  const sql = getSql();
+  const q = query?.trim().toLowerCase() ?? '';
+
+  if (!q) {
+    return sql`
+      select id, name, unit_label, calories, protein_g, carbs_g, fat_g, aliases,
+             source_url, confidence
+      from foods order by name limit ${limit}`;
+  }
+
+  return sql`
+    select id, name, unit_label, calories, protein_g, carbs_g, fat_g, aliases,
+           source_url, confidence,
+           greatest(
+             case when ${q} = any (select lower(a) from unnest(aliases) a) then 1.0 else 0 end,
+             case when lower(name) like ${'%' + q + '%'} then 0.9 else 0 end,
+             similarity(lower(name), ${q})
+           ) as score
+    from foods
+    where lower(name) like ${'%' + q + '%'}
+       or ${q} = any (select lower(a) from unnest(aliases) a)
+       or similarity(lower(name), ${q}) > 0.2
+    order by score desc, name
+    limit ${limit}`;
+}
+
+/** Creates or updates a food by id, or by name when no id is given. */
+export async function saveFood(input: {
+  food_id?: number;
   name: string;
-  source_url?: string;
-  servings?: number;
+  unit_label?: string;
   calories?: number;
   protein_g?: number;
   carbs_g?: number;
   fat_g?: number;
+  aliases?: string[];
+  source_url?: string;
+  confidence?: 'high' | 'medium' | 'low';
   notes?: string;
 }) {
   const sql = getSql();
-  const name = input.name.trim();
+
+  if (input.food_id) {
+    const [row] = await sql`
+      update foods set
+        name       = ${input.name.trim()},
+        unit_label = coalesce(${input.unit_label ?? null}, unit_label),
+        calories   = coalesce(${input.calories ?? null}, calories),
+        protein_g  = coalesce(${input.protein_g ?? null}, protein_g),
+        carbs_g    = coalesce(${input.carbs_g ?? null}, carbs_g),
+        fat_g      = coalesce(${input.fat_g ?? null}, fat_g),
+        aliases    = coalesce(${input.aliases ?? null}, aliases),
+        source_url = coalesce(${input.source_url ?? null}, source_url),
+        confidence = coalesce(${input.confidence ?? null}, confidence),
+        notes      = coalesce(${input.notes ?? null}, notes),
+        updated_at = now()
+      where id = ${input.food_id}
+      returning id, name`;
+    return { id: Number(row.id), name: row.name as string, created: false };
+  }
 
   const [row] = await sql`
-    insert into recipes (name, source_url, servings, calories, protein_g, carbs_g, fat_g, notes)
-    values (${name}, ${input.source_url ?? null}, ${input.servings ?? null},
-            ${input.calories ?? null}, ${input.protein_g ?? null},
-            ${input.carbs_g ?? null}, ${input.fat_g ?? null}, ${input.notes ?? null})
+    insert into foods (name, unit_label, calories, protein_g, carbs_g, fat_g, aliases,
+                       source_url, confidence, notes)
+    values (${input.name.trim()}, ${input.unit_label ?? 'serving'}, ${input.calories ?? null},
+            ${input.protein_g ?? null}, ${input.carbs_g ?? null}, ${input.fat_g ?? null},
+            ${input.aliases ?? []}, ${input.source_url ?? null}, ${input.confidence ?? null},
+            ${input.notes ?? null})
     on conflict (name) do update set
-      source_url = coalesce(excluded.source_url, recipes.source_url),
-      servings   = coalesce(excluded.servings,   recipes.servings),
-      calories   = coalesce(excluded.calories,   recipes.calories),
-      protein_g  = coalesce(excluded.protein_g,  recipes.protein_g),
-      carbs_g    = coalesce(excluded.carbs_g,    recipes.carbs_g),
-      fat_g      = coalesce(excluded.fat_g,      recipes.fat_g),
-      notes      = coalesce(excluded.notes,      recipes.notes),
+      unit_label = coalesce(excluded.unit_label, foods.unit_label),
+      calories   = coalesce(excluded.calories,   foods.calories),
+      protein_g  = coalesce(excluded.protein_g,  foods.protein_g),
+      carbs_g    = coalesce(excluded.carbs_g,    foods.carbs_g),
+      fat_g      = coalesce(excluded.fat_g,      foods.fat_g),
+      confidence = coalesce(excluded.confidence, foods.confidence),
       updated_at = now()
     returning id, name, (xmax = 0) as created`;
-
   return { id: Number(row.id), name: row.name as string, created: row.created as boolean };
-}
-
-export async function listRecipes(search?: string) {
-  const sql = getSql();
-  const term = search ? `%${search.trim().toLowerCase()}%` : '%';
-  return sql`
-    select id, name, source_url, servings, calories, protein_g, carbs_g, fat_g, notes
-    from recipes
-    where lower(name) like ${term}
-    order by name`;
 }

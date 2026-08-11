@@ -2,9 +2,9 @@ import { createMcpHandler } from 'mcp-handler';
 import {
   getJournalInput,
   getRecentHistoryInput,
-  listRecipesInput,
+  searchFoodsInput,
   logEntryInput,
-  saveRecipeInput,
+  saveFoodInput,
   undoEntryInput,
 } from './schemas';
 import {
@@ -12,9 +12,9 @@ import {
   describeJournal,
   getJournal,
   getRecentHistory,
-  listRecipes,
+  searchFoods,
   logEntry,
-  saveRecipe,
+  saveFood,
 } from './queries';
 
 /** Every tool returns text; this keeps the shape consistent. */
@@ -59,10 +59,12 @@ export const mcpHandler = createMcpHandler(
           );
         }
         for (const m of result.meals) {
-          const recipeNote = m.recipe
-            ? ` [${m.recipe.created ? 'saved' : 'updated'} recipe #${m.recipe.id} "${m.recipe.name}"]`
+          const foodNote = m.food
+            ? ` [${m.food.created ? 'new food' : 'known food'} #${m.food.id}]`
             : '';
-          lines.push(`  Meal "${m.description}" on ${m.entry_date}${recipeNote}`);
+          lines.push(
+            `  ${m.servings} x ${m.description} on ${m.entry_date}${foodNote}`,
+          );
         }
         if (lines.length === 0) {
           lines.push('  (journal text only — nothing structured was parsed out of it)');
@@ -139,40 +141,42 @@ export const mcpHandler = createMcpHandler(
       },
     );
     server.registerTool(
-      'save_recipe',
+      'search_foods',
       {
-        title: 'Save or update a recipe',
+        title: 'Search the food catalog',
         description:
-          'Store a recipe so its macros never have to be estimated again. Macros are PER ' +
-          'SERVING, not per batch. Saving a name that already exists updates it. Meals ' +
-          'already logged from this recipe keep the macros they were logged with — ' +
-          'refining a recipe changes what gets logged next, not what was already eaten.',
-        inputSchema: saveRecipeInput,
+          'Find a food by name, alias, or approximate spelling — "black cod" and "cod" both ' +
+          'find "nobu miso black cod". ALWAYS search before logging a meal: if a food is ' +
+          'already catalogued, log against its id instead of describing it again, and its ' +
+          'macros are reused rather than re-estimated. Omit the query to browse everything.',
+        inputSchema: searchFoodsInput,
       },
-      async (input) => {
-        const r = await saveRecipe(input);
-        return text(
-          `${r.created ? 'Saved' : 'Updated'} recipe #${r.id} "${r.name}". ` +
-            `Log meals from it with recipe_id ${r.id} and the number of servings eaten.`,
-        );
-      },
+      async ({ query, limit }) => json(await searchFoods(query, limit ?? 10)),
     );
 
     server.registerTool(
-      'list_recipes',
+      'save_food',
       {
-        title: 'List saved recipes',
+        title: 'Add or correct a food',
         description:
-          'Look up saved recipes and their per-serving macros. Check here BEFORE estimating ' +
-          'macros for a dish — if it is already saved, use its numbers and recipe_id rather ' +
-          'than guessing again.',
-        inputSchema: listRecipesInput,
+          'Create a food, or fix an existing one by passing food_id. Macros are PER UNIT of ' +
+          'unit_label. Correcting a food updates every meal ever logged with it, because ' +
+          'meals store only a pointer and a quantity — so this is how you fix a bad estimate ' +
+          'everywhere at once. Normally you do not need this when logging: put a new food ' +
+          'inline on the meal instead.',
+        inputSchema: saveFoodInput,
       },
-      async ({ search }) => json(await listRecipes(search)),
+      async (input) => {
+        const f = await saveFood(input);
+        return text(
+          `${f.created ? 'Added' : 'Updated'} food #${f.id} "${f.name}". ` +
+            `${f.created ? '' : 'Every meal logged with it now reflects these macros.'}`,
+        );
+      },
     );
   },
   {
-    serverInfo: { name: 'workout-tracker', version: '0.3.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.4.0' },
     instructions:
       'Personal fitness tracker for a single user. When they describe training, food or ' +
       'bodyweight, parse it and call log_entry with both the raw text and the structured ' +
@@ -187,14 +191,14 @@ export const mcpHandler = createMcpHandler(
       'meal. Set meal_type on every meal row.\n\n' +
       'Before estimating macros for a dish, call list_recipes. If it is saved, use its ' +
       'macros and recipe_id instead of guessing.\n\n' +
-      'EVERY dish you work out per-serving macros for gets a `recipe` on its meal, with ' +
-      '`servings` set to how many were eaten. No exceptions and no judgment about whether ' +
-      'it is worth saving or will recur — you cannot know that, and an unsaved recipe means ' +
-      'the dish is re-estimated from scratch every time (the same dish has varied by more ' +
-      'than half between estimates). Saving matches by name and is idempotent, so re-logging ' +
-      'a dish updates its recipe rather than duplicating it. The server saves and links it ' +
-      'in the same call — there is no separate save_recipe step. Only plain single foods ' +
-      '(a banana, a cup of green beans) need no recipe.\n\n' +
+      'EVERY food goes in the catalog — sides and plain items too, not just composed ' +
+      'dishes. Macros live ONLY on foods; a meal is a pointer plus how many units were ' +
+      'eaten. ALWAYS call search_foods first: if it is already catalogued, log with its ' +
+      'food_id and reuse its macros rather than estimating again. If nothing matches, put ' +
+      'the food inline on the meal with PER-UNIT macros and a unit_label ("filet", "cup", ' +
+      '"scoop") — the server catalogues it and links the meal in the same call. Give short ' +
+      'aliases so it is easy to find later. Correcting a food fixes every meal ever logged ' +
+      'with it.\n\n' +
       'For cardio, always record distance_mi when a distance is mentioned.',
   },
 );

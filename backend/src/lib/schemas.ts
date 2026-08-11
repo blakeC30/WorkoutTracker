@@ -61,32 +61,46 @@ export const bodyweightInput = z.object({
 });
 
 /**
- * A recipe supplied inline with a meal.
+ * A food supplied inline with a meal.
  *
- * This exists so logging a dish from a recipe is ONE tool call. Relying on the model to
- * follow up with a separate save_recipe call did not work in practice — it derived correct
- * per-serving macros and then dropped them, twice, with the instruction stated explicitly
- * in both the project prompt and the server's own instructions. The same dish came back
- * 60% apart on consecutive days as a result.
+ * Macros here are PER UNIT of `unit_label`, and they are the only place macros live —
+ * meals store a pointer and a quantity, nothing more. Correcting a food therefore corrects
+ * every meal ever logged with it, which is the point of the catalog.
  *
- * Filling in a field of a payload you are already sending is far more reliable than
- * remembering a second action, so the server does the saving.
+ * Supplying this inline means logging a new food is one tool call: the server upserts it by
+ * name and links the meal in the same transaction.
  */
-export const inlineRecipe = z.object({
+export const inlineFood = z.object({
   name: z
     .string()
     .min(1)
-    .describe('Short identifying name, e.g. "miso black cod". Reused to match existing recipes.'),
-  source_url: z.string().optional().describe('Where the recipe came from, if anywhere.'),
-  yields_servings: z
-    .number()
-    .positive()
+    .describe(
+      'Short catalog name for the food itself, e.g. "nobu miso black cod", "green beans". ' +
+        'Not a description of this particular serving — no "(side)", no "2 filets".',
+    ),
+  unit_label: z
+    .string()
     .optional()
-    .describe('How many servings the whole recipe makes — not how many were eaten.'),
-  calories: z.number().int().nonnegative().optional().describe('PER SERVING, not per batch.'),
-  protein_g: z.number().int().nonnegative().optional().describe('Per serving.'),
-  carbs_g: z.number().int().nonnegative().optional().describe('Per serving.'),
-  fat_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+    .describe(
+      'What ONE unit is: "filet", "cup", "scoop", "slice", "shake". Macros below are per ' +
+        'one of these. Defaults to "serving".',
+    ),
+  calories: z.number().int().nonnegative().optional().describe('Per unit.'),
+  protein_g: z.number().int().nonnegative().optional().describe('Per unit.'),
+  carbs_g: z.number().int().nonnegative().optional().describe('Per unit.'),
+  fat_g: z.number().int().nonnegative().optional().describe('Per unit.'),
+  aliases: z
+    .array(z.string())
+    .optional()
+    .describe('Short names to find it by later, e.g. ["black cod", "miso cod"].'),
+  source_url: z.string().optional(),
+  confidence: z
+    .enum(['high', 'medium', 'low'])
+    .optional()
+    .describe(
+      'How well these macros are known. This lives on the food, not the meal — fix the ' +
+        'food once and every meal using it is fixed.',
+    ),
   notes: z.string().optional(),
 });
 
@@ -96,43 +110,29 @@ export const mealInput = z.object({
     .enum(['breakfast', 'lunch', 'dinner', 'snack', 'dessert'])
     .optional()
     .describe('Which meal this belongs to. Set it on every meal row.'),
-  description: z
-    .string()
-    .min(1)
-    .describe(
-      'ONE component, not a whole meal. A dinner of cod, green beans, rice and salad is ' +
-        'four separate meal rows sharing an entry_date and meal_type — never one lumped row.',
-    ),
-  recipe_id: z
+  food_id: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe('If this came from an ALREADY-saved recipe, its id from list_recipes.'),
-  recipe: inlineRecipe
+    .describe('Id of an existing food from search_foods. Use this whenever one matches.'),
+  food: inlineFood
     .optional()
     .describe(
-      'If this dish comes from a recipe that is NOT already saved, put it here with ' +
-        'per-serving macros. The server saves it and links this meal automatically — you do ' +
-        'not need a separate save_recipe call. Set servings to how many were eaten and the ' +
-        'server computes this row\'s macros from the per-serving numbers.',
+      'For a food not yet in the catalog. The server saves it and links this meal in one ' +
+        'step. Search first — only supply this when nothing matches.',
     ),
   servings: z
     .number()
     .positive()
-    .optional()
-    .describe('Servings eaten, when logging from a recipe. Recipe macros are per serving.'),
-  calories: z.number().int().nonnegative().optional(),
-  protein_g: z.number().int().nonnegative().optional(),
-  carbs_g: z.number().int().nonnegative().optional(),
-  fat_g: z.number().int().nonnegative().optional(),
-  confidence: z
-    .enum(['high', 'medium', 'low'])
+    .default(1)
+    .describe('How many units were eaten. Two filets of a per-filet food is 2.'),
+  note: z
+    .string()
     .optional()
     .describe(
-      'How confident you are in the macro numbers. "high" if the user gave exact figures ' +
-        'or it is a packaged food; "low" if you estimated from a vague description like ' +
-        '"a big bowl of pasta". Low-confidence rows surface in the dashboard review queue.',
+      'Anything specific to THIS serving that is not true of the food generally — ' +
+        '"extra sauce", "restaurant portion". Leave empty normally.',
     ),
 });
 
@@ -199,4 +199,24 @@ export const listRecipesInput = z.object({
     .string()
     .optional()
     .describe('Optional substring to filter by name. Omit to list everything.'),
+});
+
+export const searchFoodsInput = z.object({
+  query: z
+    .string()
+    .optional()
+    .describe(
+      'What to search for. Matches names, aliases, and close spellings — "black cod" or ' +
+        '"cod" both find "nobu miso black cod". Omit to list the whole catalog.',
+    ),
+  limit: z.number().int().positive().max(50).default(10).optional(),
+});
+
+export const saveFoodInput = inlineFood.extend({
+  food_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Existing food to update. Omit to create or match by name.'),
 });

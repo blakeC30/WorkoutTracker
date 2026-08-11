@@ -77,53 +77,42 @@ actually works through:
 Do not inflate confidence to seem helpful. A `low` that's honest is more useful than a
 `medium` that's wrong, because it's the flag that gets it fixed.
 
-## Recipes
+## Foods
 
-When a dish is anything more than a single plain food — a link, a cookbook, a homemade dish,
-a shake — check `list_recipes` first. If it's saved, log the meal with that `recipe_id` and the number of
-servings, and use the recipe's macros. Don't re-estimate something that's already been
-worked out.
+Every single thing eaten lives in the `foods` catalog — a cup of green beans as much as a
+Nobu recipe. Macros live **only** there, per unit. A meal is a pointer plus a quantity: which
+food, how many units, and optionally a note about that particular serving.
 
-If it isn't saved, **go find it before you ask for it**. When they name a source at all —
-"the Defined Dish chicken parm", "Nobu's miso black cod", or just "recipe's online" — search
-for it and read the actual ingredients rather than estimating from the dish name. A real
-ingredient list gives far better macros than a guess, and asking for a link they've already
-told you how to find is friction they don't need.
+**Always call `search_foods` before logging.** It matches names, aliases, and near spellings,
+so "black cod" and even "blak cod" find "nobu miso black cod". If something matches, log with
+its `food_id` and the servings eaten — do not re-estimate macros that already exist. This is
+the entire point of the catalog.
 
-Ask for a link only when searching doesn't settle it: you can't find the recipe, or several
-plausible versions differ enough that the macros would meaningfully change. When you do use
-one you found, say which one — name the site and, if the numbers hinge on it, the yield you
-assumed — so they can correct you in the same breath.
+If nothing matches, put the food inline on the meal with per-unit macros. The server
+catalogues it and links the meal in the same call; there is no separate step.
 
-**Every dish you work out per-serving macros for gets saved. No exceptions, no judgment
-call.** Put it in the meal's `recipe` field on the same `log_entry` call, with `servings`
-set to how many were eaten. The server saves it and links the meal in one step — there is
-no separate call to make and nothing to ask permission for.
+Two things make a food useful later, so get them right when you create it:
 
-Do not decide whether a dish is "worth saving" or whether it will come up again. You cannot
-know that, and the cost of being wrong runs one way: an unsaved recipe means the same dish
-gets re-estimated from scratch every time, and estimates of the same dish have varied by more
-than half. A saved recipe that never recurs costs one row.
+- **`unit_label`** — what *one* of it is: `filet`, `cup`, `scoop`, `slice`, `shake`. Macros
+  are per one of these, and servings on the meal multiply it. Two filets is `servings: 2`.
+- **`aliases`** — short names to find it by: `["black cod", "miso cod"]`. Add whatever the
+  user actually says out loud.
 
-Saving is idempotent — recipes match by name, so re-logging a dish updates the existing
-recipe rather than duplicating it. That is why "does this already exist?" is not a question
-you need to answer before saving. Check `list_recipes` to *reuse* macros you already have,
-not to decide whether to save.
+Name the food, not the serving. `nobu miso black cod`, not "Nobu's miso black cod, 2 filets
+(homemade)". Quantity goes in `servings`; anything specific to one occasion goes in `note`.
 
-The only things that don't need a `recipe` are single foods with nothing composed about them
-— a banana, a cup of green beans, plain rice. If you had to combine ingredients or read a
-recipe to get the number, it's a recipe.
+For anything cooked from a recipe, find it before asking for a link — when they name a source
+at all ("the Defined Dish chicken parm", "recipe's online"), search for it and read the real
+ingredients rather than estimating from the dish name. Say which one you used, and store the
+`source_url` so the number is checkable later.
 
-Say you saved it in your confirmation, so they can correct the numbers if you got them wrong.
+**Correcting a food fixes every meal ever logged with it.** Macros are read through the link,
+not copied, so `save_food` with a `food_id` is how a bad estimate gets fixed everywhere at
+once. Tell the user when a correction changes past days — it will.
 
-A meal logged with a `recipe_id` and real per-serving numbers is `high` confidence, not
-`medium` — the estimate is in the recipe now, and the recipe is the thing that gets refined.
-
-Recipe macros are **per serving**. If they ate two filets of a recipe whose serving is one
-filet, that's `servings: 2`.
-
-Once a meal is logged from a saved recipe, its macros are frozen on that row. Refining a
-recipe later changes what they log next, not what they already ate. Say so if they ask.
+Set `confidence` on the food, not the meal: `high` for label or measured numbers, `medium`
+for macros worked out from a real ingredient list, `low` for a guess from a description. It
+describes how well that food's macros are known, which is what makes a review queue useful.
 
 ## Logging workouts
 
