@@ -129,6 +129,50 @@ typefaces, the spacing scale, and a list of things this codebase deliberately do
 (no cards, no gradients, no shadows, no border radius above 2px, no dark-mode toggle). It
 exists so the design stays a decision rather than drifting back to defaults.
 
+## MCP tools
+
+Fifteen, defined in `backend/src/lib/mcp.ts` with their inputs in `backend/src/lib/schemas.ts`.
+
+| Tool                    | Kind    | For                                                          |
+| ----------------------- | ------- | ------------------------------------------------------------ |
+| `log_entry`             | write   | One message of training, food, and/or bodyweight, as one journal entry |
+| `undo_entry`            | write   | Delete a journal entry and everything from it. Preview first  |
+| `save_food`             | write   | Create or correct a food. Fixes every meal ever logged with it |
+| `save_exercise`         | write   | Create or correct an exercise. **The only way to rename one** |
+| `search_foods`          | read    | Fuzzy food lookup — call before logging a meal                |
+| `search_exercises`      | read    | Fuzzy exercise lookup — call before logging a workout         |
+| `list_muscles`          | read    | The valid muscle names. Anything else is rejected             |
+| `get_recent_history`    | read    | Last N days of workouts, bodyweight and meals                 |
+| `get_journal`           | read    | Raw journal text in a date range — provenance, not numbers    |
+| `get_prs`               | read    | Best effort per exercise, typed by how it's measured          |
+| `get_exercise_history`  | read    | One movement session by session — the trend, not the record   |
+| `get_pattern_volume`    | read    | Push / pull / legs / core / cardio balance over a window      |
+| `get_pattern_recency`   | read    | Days since each pattern was last trained — what's overdue     |
+| `get_weekly_summary`    | read    | Training, nutrition and bodyweight per week                   |
+| `get_volume_by_muscle`  | read    | Volume by muscle region                                       |
+
+Keep this table current. The failure it prevents has already happened once: the server's
+`instructions` told the model to call `list_recipes` for months after migration 004 renamed
+`recipes` to `foods` and the tool was removed — a rule pointing at nothing, sitting in the
+highest-priority text the model reads.
+
+### Where a rule belongs
+
+Two layers of instruction reach the model and they do different jobs.
+
+- **`instructions` in `backend/src/lib/mcp.ts`** ships with the connector, so it applies in
+  every conversation on every surface. **Every rule protecting data integrity lives here** —
+  dates, catalog-before-create, one row per dish, Title Case, movement pattern, one entry per
+  set, never estimate RPE, confirm before deleting.
+- **`prompts/project-instructions.md`** is pasted into one Claude project and applies only
+  there. It holds judgment and tone: how hard to hunt for a real recipe, where the edge of "one
+  dish" falls, what to say back after saving.
+
+The test when adding a rule: if breaking it would corrupt data, it goes in the server. If
+breaking it would only make the assistant worse to talk to, it goes in the project file. Never
+state a rule in both — a duplicated rule eventually disagrees with itself, and the project copy
+is the one that isn't running everywhere.
+
 ## Changing an MCP tool schema — reconnect the connector
 
 **MCP clients fetch tool definitions once, when the connection is established.** Deploying a
@@ -147,13 +191,17 @@ six-field meal schema weeks later.
 
 A partial symptom is the confusing one: fields named in the project instructions still get
 populated, because the model sends them as plain strings even when its cached schema omits
-them, and the server accepts them. Nested objects (like `recipe`) never appear, because
-inventing a whole object that isn't in the schema is a much bigger leap. So you can see
-`meal_type` filling in correctly while `recipe` is silently ignored — which looks like a
-prompt problem and isn't.
+them, and the server accepts them. Nested objects (like `exercise` inside a workout) never
+appear, because inventing a whole object that isn't in the schema is a much bigger leap. So you
+can see `meal_type` filling in correctly while a nested object is silently ignored — which
+looks like a prompt problem and isn't.
 
-To check what the model actually sees, ask it directly in the conversation: *"List every
-field the log_entry tool accepts inside a meals entry."* Compare that to `tools/list` below. To confirm what a deployment is actually serving:
+The quickest check is the version. `serverInfo.version` in `backend/src/lib/mcp.ts` is bumped
+on every tool or schema change, so asking the model what version the workout-tracker server
+reports and comparing it to that constant answers "is this connector stale" in one question.
+
+To see the schema itself, ask directly: *"List every field the log_entry tool accepts inside a
+meals entry."* Compare that to `tools/list`. To confirm what a deployment is actually serving:
 
 ```bash
 SECRET=$(grep '^API_SECRET=' backend/.env.local | cut -d= -f2-)
@@ -170,8 +218,19 @@ prompt, and not the code.
 
 Neon Postgres 18, region `aws-us-east-1` (matches Vercel's default `iad1` function region).
 
-Four tables. `journals` holds the raw text of everything typed; `workouts`, `bodyweight`
-and `meals` hold the structured data parsed out of it and link back to their origin.
+Nine tables in three layers.
+
+| Layer       | Tables                                      | Holds                                        |
+| ----------- | ------------------------------------------- | -------------------------------------------- |
+| Provenance  | `journals`                                  | The raw text of everything typed              |
+| Logs        | `workouts`, `workout_sets`, `meals`, `bodyweight` | What happened on a date                 |
+| Catalogs    | `foods`, `exercises`, `exercise_muscles`, `muscles` | Facts true every time                  |
+
+The layer split is the design. A log row carries no macros and no muscle groups of its own —
+it points at a catalog row — so correcting a catalog entry corrects every entry ever logged
+with it, retroactively and everywhere. That is why both catalogs are searched before anything
+is created, and why `foods` and `exercises` each have a unique index on `lower(name)`
+(migration 007): two spellings of one thing silently halve its history.
 
 - A journal's `created_at` is **not** the data's `entry_date`. "Yesterday I squatted" is a
   journal row stamped today and a workout row dated yesterday. Never derive one from the other.

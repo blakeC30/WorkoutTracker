@@ -288,7 +288,7 @@ export async function getRecentHistory(days: number) {
   const sql = getSql();
 
   const [workouts, bodyweight, meals] = await Promise.all([
-    sql`select w.entry_date::text as entry_date, e.name as exercise, e.category, w.notes,
+    sql`select w.entry_date::text as entry_date, e.name as exercise, e.category, e.pattern, w.notes,
                count(s.id)::int as set_count,
                max(s.weight_lbs) as top_weight_lbs,
                sum(s.reps) as total_reps,
@@ -304,7 +304,7 @@ export async function getRecentHistory(days: number) {
         join exercises e on e.id = w.exercise_id
         left join workout_sets s on s.workout_id = w.id
         where w.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
-        group by w.id, w.entry_date, e.name, e.category, w.notes
+        group by w.id, w.entry_date, e.name, e.category, e.pattern, w.notes
         order by w.entry_date desc, e.name`,
     sql`select entry_date::text as entry_date, weight_lbs, notes
         from bodyweight
@@ -466,8 +466,13 @@ export async function saveFood(input: {
 export async function searchExercises(query?: string, limit = 10) {
   const sql = getSql();
   const q = query?.trim().toLowerCase() ?? '';
+  // `pattern` is selected alongside category deliberately. Without it the model can SET a
+  // pattern when it creates an exercise inline but can never SEE one, so a movement filed under
+  // the wrong pattern is invisible and stays wrong forever — and pattern is the axis the whole
+  // calendar groups days by. Returning it makes a bad value noticeable at the moment the
+  // exercise is looked up, which is the only moment anyone is thinking about it.
   const base = sql`
-    select e.id, e.name, e.aliases, e.category, e.equipment,
+    select e.id, e.name, e.aliases, e.category, e.pattern, e.equipment,
            coalesce(json_agg(json_build_object('muscle', m.name, 'region', m.region, 'role', em.role)
                     order by em.role, m.name) filter (where m.id is not null), '[]') as muscles
     from exercises e
@@ -477,7 +482,7 @@ export async function searchExercises(query?: string, limit = 10) {
   if (!q) return base;
 
   return sql`
-    select e.id, e.name, e.aliases, e.category, e.equipment,
+    select e.id, e.name, e.aliases, e.category, e.pattern, e.equipment,
            coalesce(json_agg(json_build_object('muscle', m.name, 'region', m.region, 'role', em.role)
                     order by em.role, m.name) filter (where m.id is not null), '[]') as muscles,
            greatest(
@@ -494,6 +499,155 @@ export async function searchExercises(query?: string, limit = 10) {
     group by e.id
     order by score desc, e.name
     limit ${limit}`;
+}
+
+/**
+ * Creates or corrects an exercise — the twin of saveFood, and for a long time the missing one.
+ *
+ * Without it the only way to touch an exercise was to log a workout with the movement supplied
+ * inline, because that path upserts. So fixing a pattern meant inventing a training session,
+ * and renaming was impossible outright: the upsert matches on lower(name), so "Barbell Back
+ * Squat" over "barbell back squt" created a SECOND exercise and split the history in half
+ * rather than repairing it. Passing exercise_id here updates the row in place, which is what
+ * makes a rename a rename.
+ *
+ * A Pool rather than the HTTP driver, because muscles live in their own table: correcting a
+ * movement's muscles is a delete and a set of inserts that must land together with the name
+ * change or not at all.
+ */
+export async function saveExercise(input: {
+  exercise_id?: number;
+  name: string;
+  aliases?: string[];
+  category?: string;
+  pattern?: string;
+  equipment?: string;
+  primary_muscles?: string[];
+  secondary_muscles?: string[];
+  notes?: string;
+}): Promise<{ id: number; name: string; created: boolean; renamedFrom?: string }> {
+  const client = await getPool().connect();
+
+  try {
+    await client.query('begin');
+
+    let id: number;
+    let name: string;
+    let created: boolean;
+    let renamedFrom: string | undefined;
+
+    if (input.exercise_id) {
+      const { rows: before } = await client.query<{ name: string }>(
+        'select name from exercises where id = $1',
+        [input.exercise_id],
+      );
+      if (before.length === 0) {
+        throw new Error(
+          `No exercise #${input.exercise_id}. Call search_exercises to find the right id.`,
+        );
+      }
+
+      // Every field but the name is coalesced, so omitting one leaves it alone. The name is
+      // NOT: this is the only path that can rename, and coalescing it would mean the tool
+      // silently declined to do the one thing it uniquely exists for.
+      const { rows } = await client.query<{ id: string; name: string }>(
+        `update exercises set
+           name      = $2,
+           aliases   = case when $3::text[] is null then aliases
+                            else (select coalesce(array_agg(distinct a), '{}')
+                                  from unnest(aliases || $3::text[]) a) end,
+           category  = coalesce($4, category),
+           pattern   = coalesce($5, pattern),
+           equipment = coalesce($6, equipment),
+           notes     = coalesce($7, notes),
+           updated_at = now()
+         where id = $1
+         returning id, name`,
+        [
+          input.exercise_id, input.name.trim(), input.aliases ?? null, input.category ?? null,
+          input.pattern ?? null, input.equipment ?? null, input.notes ?? null,
+        ],
+      );
+      id = Number(rows[0].id);
+      name = rows[0].name;
+      created = false;
+      if (before[0].name !== name) renamedFrom = before[0].name;
+    } else {
+      const { rows } = await client.query<{ id: string; name: string; created: boolean }>(
+        `insert into exercises (name, aliases, category, pattern, equipment, notes)
+         values ($1, coalesce($2::text[],'{}'), $3, $4, $5, $6)
+         on conflict (lower(name)) do update set
+           aliases   = (select coalesce(array_agg(distinct a), '{}')
+                        from unnest(exercises.aliases || excluded.aliases) a),
+           category  = coalesce(excluded.category,  exercises.category),
+           pattern   = coalesce(excluded.pattern,   exercises.pattern),
+           equipment = coalesce(excluded.equipment, exercises.equipment),
+           notes     = coalesce(excluded.notes,     exercises.notes),
+           updated_at = now()
+         returning id, name, (xmax = 0) as created`,
+        [
+          input.name.trim(), input.aliases ?? null, input.category ?? null,
+          input.pattern ?? (input.category === 'cardio' ? 'cardio' : null),
+          input.equipment ?? null, input.notes ?? null,
+        ],
+      );
+      id = Number(rows[0].id);
+      name = rows[0].name;
+      created = rows[0].created;
+    }
+
+    // Muscles are REPLACED per role, and only for a role that was actually supplied. Merging
+    // would make a correction impossible — the wrong muscle you are here to remove would
+    // survive every attempt to remove it. Omitting the field entirely leaves that role as it is.
+    for (const [role, names] of [
+      ['primary', input.primary_muscles],
+      ['secondary', input.secondary_muscles],
+    ] as const) {
+      if (!names) continue;
+      await client.query(
+        'delete from exercise_muscles where exercise_id = $1 and role = $2',
+        [id, role],
+      );
+      for (const raw of names) {
+        const { rows: mrows } = await client.query<{ id: string }>(
+          'select id from muscles where lower(name) = $1',
+          [raw.trim().toLowerCase()],
+        );
+        if (mrows.length === 0) {
+          throw new Error(`Unknown muscle "${raw}". Call list_muscles for the valid names.`);
+        }
+        await client.query(
+          `insert into exercise_muscles (exercise_id, muscle_id, role)
+           values ($1, $2, $3)
+           on conflict (exercise_id, muscle_id) do update set role = excluded.role`,
+          [id, mrows[0].id, role],
+        );
+      }
+    }
+
+    await client.query('commit');
+    return { id, name, created, renamedFrom };
+  } catch (error) {
+    await client.query('rollback');
+    // The unique index on lower(name) is the likeliest failure here, and its raw message names
+    // an index rather than the problem. Renaming onto a name already in use is a real
+    // situation — two spellings of one movement, both with history — and merging them is not
+    // something a tool should do behind your back.
+    // 23505 is unique_violation; the index is the one migration 007 created.
+    if (
+      typeof error === 'object' && error !== null &&
+      (error as { code?: string }).code === '23505' &&
+      String((error as { constraint?: string }).constraint ?? '').includes('exercises_name_lower')
+    ) {
+      throw new Error(
+        `Another exercise is already called "${input.name.trim()}". Two exercises cannot ` +
+          'share a name. Log against the existing one instead, or pick a different name.',
+      );
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** The valid muscle names, so the model can pick from them rather than inventing. */

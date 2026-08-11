@@ -254,23 +254,16 @@ export type BodyweightInput = z.infer<typeof bodyweightInput>;
 export type MealInput = z.infer<typeof mealInput>;
 export type LogEntryInput = z.infer<typeof logEntryInput>;
 
-export const saveRecipeInput = z.object({
-  name: z.string().min(1).describe('Short identifying name, e.g. "miso black cod".'),
-  source_url: z.string().optional().describe('Where the recipe came from, if anywhere.'),
-  servings: z.number().positive().optional().describe('How many servings the recipe yields.'),
-  calories: z.number().int().nonnegative().optional().describe('PER SERVING, not per batch.'),
-  protein_g: z.number().int().nonnegative().optional().describe('Per serving.'),
-  carbs_g: z.number().int().nonnegative().optional().describe('Per serving.'),
-  fat_g: z.number().int().nonnegative().optional().describe('Per serving.'),
-  notes: z.string().optional(),
-});
-
-export const listRecipesInput = z.object({
-  search: z
-    .string()
-    .optional()
-    .describe('Optional substring to filter by name. Omit to list everything.'),
-});
+/*
+ * `saveRecipeInput` and `listRecipesInput` used to sit here.
+ *
+ * The `recipes` table was renamed to `foods` in migration 004 and `meals.recipe_id` was dropped
+ * with it, so both schemas described a table that no longer exists. Neither was imported
+ * anywhere, which is why they survived — dead code that still reads as an API. They are gone
+ * rather than deprecated: the food catalog is the only place macros live now, and a second
+ * vocabulary for it is exactly how the server instructions ended up telling the model to call a
+ * `list_recipes` tool that had not existed for months.
+ */
 
 export const searchFoodsInput = z.object({
   query: z
@@ -301,7 +294,31 @@ export const searchExercisesInput = z.object({
 });
 
 export const saveExerciseInput = inlineExercise.extend({
-  exercise_id: z.number().int().positive().optional().describe('Existing exercise to update.'),
+  exercise_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'The exercise to correct, from search_exercises. Required to rename one: without an id ' +
+        'a changed spelling is matched as a new movement and creates a second row, splitting ' +
+        'the history. Omit only to create.',
+    ),
+}).extend({
+  // Re-described rather than inherited. On the inline schema these are facts about a movement
+  // being catalogued for the first time; here they are a correction, and replace what is
+  // already stored — a difference worth stating where the model reads it.
+  primary_muscles: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'REPLACES the primary muscles, rather than adding to them — send the full corrected ' +
+        'list. Omit to leave them untouched. Names from list_muscles.',
+    ),
+  secondary_muscles: z
+    .array(z.string())
+    .optional()
+    .describe('REPLACES the secondary muscles. Omit to leave them untouched.'),
 });
 
 export const getPrsInput = z.object({
@@ -315,4 +332,34 @@ export const getPrsInput = z.object({
 export const getWeeklySummaryInput = z.object({
   weeks: z.number().int().positive().max(52).default(8).optional()
     .describe('How many weeks back to summarize.'),
+});
+
+/*
+ * Window schemas for the analysis tools.
+ *
+ * Defined here rather than inline at the registration site so every tool's input is described
+ * in one file. get_volume_by_muscle used to declare its own inline and was the only one that
+ * did, which is the kind of small inconsistency that makes the next person assume there are
+ * two conventions.
+ */
+export const getVolumeByMuscleInput = z.object({
+  days: z.number().int().positive().max(365).default(28).optional()
+    .describe('How many days back to attribute volume over.'),
+});
+
+export const getVolumeByPatternInput = z.object({
+  days: z.number().int().positive().max(365).default(28).optional()
+    .describe('How many days back to total each pattern over.'),
+});
+
+export const getExerciseHistoryInput = z.object({
+  name: z
+    .string()
+    .min(1)
+    .describe(
+      'Exact catalogued name of the movement, e.g. "Barbell Back Squat". Matched without ' +
+        'regard to case but not fuzzily — search_exercises first to get it right.',
+    ),
+  limit: z.number().int().positive().max(365).default(120).optional()
+    .describe('How many of the most recent sessions to return.'),
 });
