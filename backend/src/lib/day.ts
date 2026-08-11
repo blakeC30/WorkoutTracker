@@ -153,10 +153,14 @@ export async function getPatternRecency() {
 
   return sql`
     with patterns(pattern) as (
-      -- 'other' is listed so sports and anything else unclassified appear here rather than
-      -- vanishing. A pattern you last trained a fortnight ago is exactly what this strip is
-      -- for, and omitting the bucket meant an occasional match was never reported at all.
-      values ('push'), ('pull'), ('legs'), ('core'), ('cardio'), ('other')
+      -- The five only. This strip answers "what should I train next", and nobody plans to train
+      -- "other" — so listing it added a permanent sixth column reading "—", sorted to the front
+      -- by the never-trained-first ordering and coloured as overdue. It made the header announce
+      -- "1 over a week" about something that had never been done and was not going to be.
+      --
+      -- Sports are still reported where the question is what HAPPENED rather than what is next:
+      -- Today's volume, the coverage matrix, and the exercise's own row.
+      values ('push'), ('pull'), ('legs'), ('core'), ('cardio')
     ),
     last_done as (
       select e.pattern, max(w.entry_date) as last_date
