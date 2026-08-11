@@ -72,6 +72,28 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
       where reps is not null and coalesce(weight_lbs, 0) = 0
       order by exercise_id, reps desc, entry_date asc
     ),
+    -- One value per day per exercise, in whatever unit that exercise is measured in.
+    --
+    -- This exists so each row on the Lifts list can be drawn against ITS OWN history. The list
+    -- previously scaled every bar against the heaviest exercise in it, which put a curl at 11%
+    -- of a leg press — a comparison that cannot mean anything, since nobody curls what they leg
+    -- press. Trending an exercise against itself is the only comparison that does.
+    --
+    -- The coalesce picks the measure the exercise actually uses, in the same priority the record
+    -- types use: loaded, then unloaded reps, then distance, then time. Mixing units across rows
+    -- is fine precisely because these series are never compared to each other.
+    per_day as (
+      select exercise_id, entry_date,
+             coalesce(
+               max(case when weight_lbs > 0 and reps is not null and reps <= 12
+                        then weight_lbs * (1 + reps::numeric / 30) end),
+               max(case when coalesce(weight_lbs, 0) = 0 then reps end),
+               max(distance_mi),
+               max(duration_min)
+             ) as value
+      from matched
+      group by exercise_id, entry_date
+    ),
     -- Unloaded work: cardio and timed holds. Without this, running, rowing and planks have
     -- no record of any kind and simply vanish from the list — the longest run of the block
     -- is as much a PR as the heaviest single.
@@ -113,13 +135,25 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
            en.best_duration_min,
            round(en.best_pace_min_per_mi, 2) as best_pace_min_per_mi,
            count(*)::int           as total_sets,
-           max(m.entry_date)::text as last_performed
+           max(m.entry_date)::text as last_performed,
+           -- The last ten sessions, oldest first, so the row can draw its own trend. The inner
+           -- query takes the most RECENT ten and the outer aggregation re-sorts them ascending;
+           -- ordering ascending inside would pin the series to the first ten ever recorded.
+           (select json_agg(round(v.value, 2) order by v.entry_date)
+            from (select entry_date, value
+                  from per_day p
+                  where p.exercise_id = m.exercise_id and p.value is not null
+                  order by p.entry_date desc
+                  limit 10) v) as trend
     from matched m
     left join heaviest  h  on h.exercise_id  = m.exercise_id
     left join best_e1rm b  on b.exercise_id  = m.exercise_id
     left join endurance en on en.exercise_id = m.exercise_id
     left join calisthenic c on c.exercise_id = m.exercise_id
-    group by m.exercise, m.category, m.pattern, h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
+    -- m.exercise_id is grouped so the trend subquery can correlate on it. It is 1:1 with the
+    -- name, so this does not change how rows are grouped.
+    group by m.exercise_id, m.exercise, m.category, m.pattern,
+             h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
              b.e1rm, b.weight_lbs, b.reps, b.entry_date,
              en.best_distance_mi, en.best_duration_min, en.best_pace_min_per_mi,
              c.exercise_id, c.reps, c.entry_date

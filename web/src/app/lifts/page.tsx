@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { getPrs, n, type PrRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
+import { Masthead, Section, Rule, Sparkline, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, clock, daysAgo, dec, int, shortDay } from '@/lib/format';
@@ -38,22 +37,17 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
   const bodyweight = result.rows.filter((r) => r.record_type === 'bodyweight');
   const endurance = result.rows.filter((r) => r.record_type === 'endurance');
 
-  // The scale for the e1RM bars. Squats dwarf curls, so this is a rough sense of where the
-  // heavy work sits, not a claim that the exercises are comparable.
-  const maxE1rm = Math.max(...weighted.map((r) => n(r.best_e1rm_lbs) ?? 0), 1);
-  // Two scales, because Bodyweight now holds two units: push-ups measured in reps and planks
-  // measured in minutes. Each row is drawn against the best of its OWN unit — one shared scale
-  // would put a 20-rep set and a 1-minute hold on the same axis, which means nothing.
-  const maxReps = Math.max(...bodyweight.map((r) => r.best_reps ?? 0), 1);
-  const maxHold = Math.max(...bodyweight.map((r) => n(r.best_duration_min) ?? 0), 1);
+  // No cross-exercise scale any more. Every row is drawn against its own history, so there is
+  // nothing left to normalise against and no implied claim that a curl and a leg press belong
+  // on the same axis.
 
   return (
     <>
       {weighted.length > 0 ? (
         <Reveal>
           <Section label="Loaded" aside={`${weighted.length}`}>
-            {weighted.map((row, i) => (
-              <Weighted key={row.exercise} row={row} max={maxE1rm} index={i} />
+            {weighted.map((row) => (
+              <Weighted key={row.exercise} row={row} />
             ))}
           </Section>
         </Reveal>
@@ -67,8 +61,8 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
       {bodyweight.length > 0 ? (
         <Reveal>
           <Section label="Bodyweight" aside={`${bodyweight.length}`}>
-            {bodyweight.map((row, i) => (
-              <Calisthenic key={row.exercise} row={row} maxReps={maxReps} maxHold={maxHold} index={i} />
+            {bodyweight.map((row) => (
+              <Calisthenic key={row.exercise} row={row} />
             ))}
           </Section>
         </Reveal>
@@ -94,19 +88,18 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
   );
 }
 
-function Weighted({ row, max, index }: { row: PrRow; max: number; index: number }) {
+function Weighted({ row }: { row: PrRow }) {
   return (
     <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
-      <WeightedBody row={row} max={max} index={index} />
+      <WeightedBody row={row} />
     </Link>
   );
 }
 
-function WeightedBody({ row, max, index }: { row: PrRow; max: number; index: number }) {
+function WeightedBody({ row }: { row: PrRow }) {
   const e1rm = n(row.best_e1rm_lbs);
   const heaviest = n(row.heaviest_lbs);
   const stale = daysAgo(row.last_performed) > 28;
-  const pct = e1rm !== null ? (e1rm / max) * 100 : 0;
 
   return (
     <div style={{ padding: '12px 0', borderTop: '1px solid var(--rule)', opacity: stale ? 0.55 : 1 }}>
@@ -123,21 +116,7 @@ function WeightedBody({ row, max, index }: { row: PrRow; max: number; index: num
         </span>
       </div>
 
-      {/* Tinted by the same palette the calendar uses, so scanning this list groups your
-          pressing and pulling work without any sorting or headers. */}
-      <div style={{ height: 3, background: 'var(--rule)', margin: '9px 0 8px' }}>
-        <div
-          className="draw-x"
-          style={
-            {
-              width: `${pct}%`,
-              height: '100%',
-              background: patternColor(row.pattern),
-              '--delay': `${index * 45}ms`,
-            } as CSSProperties
-          }
-        />
-      </div>
+      <Trend row={row} />
 
       {/* Two dates sit on this line and they mean different things — when the best set happened,
           and when the exercise was last touched. Grouped and separated so they can't be read as
@@ -205,13 +184,14 @@ function EnduranceBody({ row }: { row: PrRow }) {
           "best" and "longest" on every item pushed this past 350px, and with nowrap items the
           overflow lands mid-phrase — "last 6d" on one line and "ago" on the next. Shorter labels
           plus wrapping by GROUP means it degrades to two clean lines instead. */}
+      <Trend row={row} />
+
       <div
         className="mono"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
           gap: 12,
-          marginTop: 7,
           fontSize: 'var(--t-cap)',
           color: 'var(--ink-faint)',
         }}
@@ -235,7 +215,7 @@ function EnduranceBody({ row }: { row: PrRow }) {
  * the calisthenic equivalent of adding weight to the bar, whereas total reps mostly measures how
  * long you spent. The total is still shown, in the meta line where volume sits on a loaded row.
  */
-function Calisthenic(props: { row: PrRow; maxReps: number; maxHold: number; index: number }) {
+function Calisthenic(props: { row: PrRow }) {
   return (
     <Link
       href={`/lifts/${encodeURIComponent(props.row.exercise)}`}
@@ -247,17 +227,7 @@ function Calisthenic(props: { row: PrRow; maxReps: number; maxHold: number; inde
   );
 }
 
-function CalisthenicBody({
-  row,
-  maxReps,
-  maxHold,
-  index,
-}: {
-  row: PrRow;
-  maxReps: number;
-  maxHold: number;
-  index: number;
-}) {
+function CalisthenicBody({ row }: { row: PrRow }) {
   const stale = daysAgo(row.last_performed) > 28;
 
   // Reps when the movement has them, hold time when it does not. A plank has no reps at all,
@@ -267,7 +237,7 @@ function CalisthenicBody({
   const isReps = reps !== null;
   const value = isReps ? String(reps) : dec(hold, hold !== null && hold < 10 ? 1 : 0);
   const unit = isReps ? 'REPS' : 'MIN';
-  const pct = isReps ? (reps / maxReps) * 100 : hold !== null ? (hold / maxHold) * 100 : 0;
+
 
   return (
     <div style={{ padding: '12px 0', borderTop: '1px solid var(--rule)', opacity: stale ? 0.55 : 1 }}>
@@ -284,19 +254,7 @@ function CalisthenicBody({
         </span>
       </div>
 
-      <div style={{ height: 3, background: 'var(--rule)', margin: '9px 0 8px' }}>
-        <div
-          className="draw-x"
-          style={
-            {
-              width: `${pct}%`,
-              height: '100%',
-              background: patternColor(row.pattern),
-              '--delay': `${index * 45}ms`,
-            } as CSSProperties
-          }
-        />
-      </div>
+      <Trend row={row} />
 
       {/* Same treatment as the endurance rows: two unbreakable groups, short labels. Spelling
           out "best set, 10 AUG" and "last yesterday" ran past 350px and wrapped mid-phrase. */}
@@ -322,6 +280,45 @@ function CalisthenicBody({
           {row.total_sets} sets · {agoLabel(row.last_performed).toLowerCase()}
         </span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A row's own recent history, as a sparkline.
+ *
+ * This replaced a bar whose length was that exercise's record divided by the biggest record in
+ * the list. That comparison is meaningless — a curl will never approach a leg press — so the
+ * bar was telling you which exercises use big muscles, which you already knew. The sparkline
+ * compares the exercise only to itself, which is the question actually being asked: is this
+ * moving?
+ *
+ * Units differ from row to row (pounds, reps, miles, minutes) and that is fine precisely because
+ * these series are never read against each other. The y-axis is unlabelled for the same reason:
+ * the shape is the message, and a number would invite exactly the comparison being removed.
+ */
+function Trend({ row }: { row: PrRow }) {
+  const points = row.trend ?? [];
+  const tone = patternColor(row.pattern);
+
+  // One session is a dot, not a line. A flat rule makes it clear there is nothing to trend yet
+  // rather than implying a plateau.
+  if (points.length < 2) {
+    return (
+      <div style={{ height: 22, margin: '8px 0 6px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ height: 1, width: 18, background: tone, opacity: 0.5 }} />
+      </div>
+    );
+  }
+
+  // The floor is 15% of the exercise's own top value, so a lift that moved 12lb does not draw
+  // the same dramatic peaks as one that moved 200. Proportional rather than absolute, because
+  // these series are in different units — pounds, reps, miles, minutes.
+  const floor = Math.max(...points) * 0.15;
+
+  return (
+    <div style={{ margin: '10px 0 8px' }}>
+      <Sparkline points={points} height={24} tone={tone} fill={false} floor={floor} />
     </div>
   );
 }

@@ -130,6 +130,14 @@ export type PrRow = {
   best_pace_min_per_mi: Num;
   total_sets: number;
   last_performed: string;
+  /**
+   * The last ten sessions, oldest first, in whatever unit this exercise is measured in.
+   *
+   * Drawn as a sparkline per row so each exercise is shown against ITS OWN history. The list
+   * used to scale every bar against the heaviest exercise on it, which put a curl at 11% of a
+   * leg press — a comparison nobody can act on, since nobody curls what they leg press.
+   */
+  trend: number[] | null;
 };
 
 export type ReviewRow = {

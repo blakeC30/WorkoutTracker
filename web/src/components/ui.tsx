@@ -187,11 +187,21 @@ export function Sparkline({
   height = 44,
   tone = 'var(--signal)',
   fill = true,
+  floor = 0,
 }: {
   points: number[];
   height?: number;
   tone?: string;
   fill?: boolean;
+  /**
+   * Minimum span of the y-axis, in data units.
+   *
+   * Without it a sparkline always fills its full height, because it scales to its own min and
+   * max — so a lift that moved 12lb draws the same dramatic peaks as one that moved 200. Passing
+   * a floor proportional to the values keeps small changes looking small. The series is centred
+   * within the padded range rather than pinned to the bottom of it.
+   */
+  floor?: number;
 }) {
   if (points.length < 2) return null;
 
@@ -200,10 +210,12 @@ export function Sparkline({
   const min = Math.min(...points);
   const max = Math.max(...points);
   // A flat series would divide by zero; drawing it down the middle is the honest picture.
-  const span = max - min || 1;
+  const span = Math.max(max - min, floor, 1e-9) || 1;
+  const mid = (min + max) / 2;
+  const lo = mid - span / 2;
   const step = W / (points.length - 1);
 
-  const coords = points.map((p, i) => [i * step, H - ((p - min) / span) * H] as const);
+  const coords = points.map((p, i) => [i * step, H - ((p - lo) / span) * H] as const);
   const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
   const area = `${line} L${W},${H} L0,${H} Z`;
   const [lastX, lastY] = coords[coords.length - 1];
