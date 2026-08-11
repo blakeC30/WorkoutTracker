@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { PrRow } from '@/lib/backend';
 import { Section, Rule, Sparkline, Empty } from '@/components/ui';
-import { ListControls, matches, type SortOption } from '@/components/ListControls';
+import { ListControls, matches, type FilterOption, type SortOption } from '@/components/ListControls';
 import { patternColor, patternLabel } from '@/lib/patterns';
 import { n } from '@/lib/num';
 import { agoLabel, clock, daysAgo, dec, int, parseDay, shortDay } from '@/lib/format';
@@ -26,11 +26,19 @@ const SORTS: SortOption<PrRow>[] = [
   { key: 'name', label: 'A–Z', compare: (a, b) => a.exercise.localeCompare(b.exercise) },
 ];
 
+const SECTIONS = [
+  { key: 'weighted', label: 'Loaded' },
+  { key: 'bodyweight', label: 'Bodyweight' },
+  { key: 'endurance', label: 'Cardio' },
+  { key: 'other', label: 'Sport' },
+] as const;
+
 export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('recent');
+  const [section, setSection] = useState('all');
 
-  const shown = useMemo(() => {
+  const found = useMemo(() => {
     const active = SORTS.find((option) => option.key === sort) ?? SORTS[0];
     // Pattern is searchable too, so "pull" finds every pulling movement without needing to
     // remember which exercises those are.
@@ -38,6 +46,21 @@ export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean
       .filter((row) => matches(`${row.exercise} ${row.pattern ?? ''}`, query))
       .sort(active.compare);
   }, [rows, query, sort]);
+
+  // Counts come from the SEARCH result, not the whole catalog, so a chip never advertises rows
+  // that the current query has already excluded.
+  const filters: FilterOption[] = [
+    { key: 'all', label: 'All', count: found.length },
+    ...SECTIONS.map((s) => ({
+      key: s.key,
+      label: s.label,
+      count: found.filter((r) => r.record_type === s.key).length,
+    })).filter((f) => f.count > 0),
+  ];
+
+  // A chip for a section that has just emptied would otherwise stay selected and show nothing.
+  const activeSection = filters.some((f) => f.key === section) ? section : 'all';
+  const shown = activeSection === 'all' ? found : found.filter((r) => r.record_type === activeSection);
 
   const weighted = shown.filter((r) => r.record_type === 'weighted');
   const bodyweight = shown.filter((r) => r.record_type === 'bodyweight');
@@ -55,6 +78,9 @@ export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean
         onSort={setSort}
         showing={shown.length}
         total={rows.length}
+        filters={filters}
+        activeFilter={activeSection}
+        onFilter={setSection}
       />
 
       {shown.length === 0 ? (
