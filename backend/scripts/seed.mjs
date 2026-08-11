@@ -41,22 +41,27 @@ const round5 = (n) => Math.round(n / 5) * 5;
 // --- catalogs -----------------------------------------------------------------------------
 
 const EXERCISES = [
-  { name: 'barbell back squat',    category: 'strength', equipment: 'barbell',    primary: ['quads', 'glutes'],   secondary: ['hamstrings', 'lower back'], aliases: ['squat', 'back squat'] },
-  { name: 'barbell bench press',   category: 'strength', equipment: 'barbell',    primary: ['chest'],             secondary: ['triceps', 'front delts'],   aliases: ['bench', 'bench press'] },
-  { name: 'conventional deadlift', category: 'strength', equipment: 'barbell',    primary: ['hamstrings', 'glutes'], secondary: ['lower back', 'traps'],   aliases: ['deadlift', 'dl'] },
-  { name: 'overhead press',        category: 'strength', equipment: 'barbell',    primary: ['front delts'],       secondary: ['triceps', 'side delts'],    aliases: ['ohp', 'shoulder press'] },
-  { name: 'barbell row',           category: 'strength', equipment: 'barbell',    primary: ['lats', 'rhomboids'], secondary: ['biceps'],                   aliases: ['bb row'] },
-  { name: 'romanian deadlift',     category: 'strength', equipment: 'barbell',    primary: ['hamstrings'],        secondary: ['glutes', 'lower back'],     aliases: ['rdl'] },
-  { name: 'incline dumbbell press',category: 'strength', equipment: 'dumbbell',   primary: ['chest'],             secondary: ['front delts', 'triceps'],   aliases: ['incline press'] },
-  { name: 'lat pulldown',          category: 'strength', equipment: 'machine',    primary: ['lats'],              secondary: ['biceps'],                   aliases: ['pulldown'] },
-  { name: 'leg press',             category: 'strength', equipment: 'machine',    primary: ['quads'],             secondary: ['glutes'],                   aliases: [] },
-  { name: 'dumbbell curl',         category: 'strength', equipment: 'dumbbell',   primary: ['biceps'],            secondary: ['forearms'],                 aliases: ['curls'] },
-  { name: 'cable tricep pushdown', category: 'strength', equipment: 'cable',      primary: ['triceps'],           secondary: [],                           aliases: ['pushdown'] },
-  { name: 'plank',                 category: 'strength', equipment: 'bodyweight', primary: ['abs'],               secondary: ['obliques'],                 aliases: [] },
+  { name: 'barbell back squat',    category: 'strength', pattern: 'legs', equipment: 'barbell',    primary: ['quads', 'glutes'],   secondary: ['hamstrings', 'lower back'], aliases: ['squat', 'back squat'] },
+  { name: 'barbell bench press',   category: 'strength', pattern: 'push', equipment: 'barbell',    primary: ['chest'],             secondary: ['triceps', 'front delts'],   aliases: ['bench', 'bench press'] },
+  { name: 'conventional deadlift', category: 'strength', pattern: 'legs', equipment: 'barbell',    primary: ['hamstrings', 'glutes'], secondary: ['lower back', 'traps'],   aliases: ['deadlift', 'dl'] },
+  { name: 'overhead press',        category: 'strength', pattern: 'push', equipment: 'barbell',    primary: ['front delts'],       secondary: ['triceps', 'side delts'],    aliases: ['ohp', 'shoulder press'] },
+  { name: 'barbell row',           category: 'strength', pattern: 'pull', equipment: 'barbell',    primary: ['lats', 'rhomboids'], secondary: ['biceps'],                   aliases: ['bb row'] },
+  { name: 'romanian deadlift',     category: 'strength', pattern: 'legs', equipment: 'barbell',    primary: ['hamstrings'],        secondary: ['glutes', 'lower back'],     aliases: ['rdl'] },
+  { name: 'incline dumbbell press',category: 'strength', pattern: 'push', equipment: 'dumbbell',   primary: ['chest'],             secondary: ['front delts', 'triceps'],   aliases: ['incline press'] },
+  { name: 'lat pulldown',          category: 'strength', pattern: 'pull', equipment: 'machine',    primary: ['lats'],              secondary: ['biceps'],                   aliases: ['pulldown'] },
+  { name: 'leg press',             category: 'strength', pattern: 'legs', equipment: 'machine',    primary: ['quads'],             secondary: ['glutes'],                   aliases: [] },
+  { name: 'dumbbell curl',         category: 'strength', pattern: 'pull', equipment: 'dumbbell',   primary: ['biceps'],            secondary: ['forearms'],                 aliases: ['curls'] },
+  { name: 'cable tricep pushdown', category: 'strength', pattern: 'push', equipment: 'cable',      primary: ['triceps'],           secondary: [],                           aliases: ['pushdown'] },
+  { name: 'plank',                 category: 'strength', pattern: 'core', equipment: 'bodyweight', primary: ['abs'],               secondary: ['obliques'],                 aliases: [] },
   // Cardio: cardiovascular is primary — the legs work, but conditioning is the point.
-  { name: 'treadmill run',         category: 'cardio',   equipment: 'treadmill',  primary: ['cardiovascular'],    secondary: ['quads', 'calves'],          aliases: ['run', 'treadmill'] },
-  { name: 'stationary bike',       category: 'cardio',   equipment: 'bike',       primary: ['cardiovascular'],    secondary: ['quads'],                    aliases: ['bike'] },
-  { name: 'rowing machine',        category: 'cardio',   equipment: 'machine',    primary: ['cardiovascular'],    secondary: ['lats', 'quads'],            aliases: ['rower', 'erg'] },
+  { name: 'treadmill run',         category: 'cardio', pattern: 'cardio',   equipment: 'treadmill',  primary: ['cardiovascular'],    secondary: ['quads', 'calves'],          aliases: ['run', 'treadmill'] },
+  { name: 'stationary bike',       category: 'cardio', pattern: 'cardio',   equipment: 'bike',       primary: ['cardiovascular'],    secondary: ['quads'],                    aliases: ['bike'] },
+  // Sport: no pattern of its own, so it lands in the catch-all the dashboard calls
+  // "Sport & other". Occasional by design — a weekend game, not a training block.
+  { name: 'basketball',            category: 'sport',    pattern: 'other', equipment: 'none',       primary: ['cardiovascular'],    secondary: ['quads', 'calves'],          aliases: ['hoops', 'pickup'] },
+  { name: 'tennis',                category: 'sport',    pattern: 'other', equipment: 'racquet',    primary: ['cardiovascular'],    secondary: ['quads', 'side delts'],      aliases: [] },
+
+  { name: 'rowing machine',        category: 'cardio', pattern: 'cardio',   equipment: 'machine',    primary: ['cardiovascular'],    secondary: ['lats', 'quads'],            aliases: ['rower', 'erg'] },
 ];
 
 const FOODS = [
@@ -127,11 +132,17 @@ async function main() {
     const exerciseIds = new Map();
     for (const ex of EXERCISES) {
       const { rows } = await client.query(
-        `insert into exercises (name, aliases, category, equipment, is_seed)
-         values ($1, $2::text[], $3, $4, true)
-         on conflict (name) do update set is_seed = exercises.is_seed
+        // pattern is not optional here. Without it a re-seed recreates every exercise with a
+        // null pattern, and the whole dashboard collapses: no bars on Today, no lit calendar
+        // slots, every movement filed under "other". coalesce on conflict so a pattern
+        // corrected by hand is never overwritten by a re-run.
+        `insert into exercises (name, aliases, category, pattern, equipment, is_seed)
+         values ($1, $2::text[], $3, $4, $5, true)
+         on conflict (name) do update set
+           is_seed = exercises.is_seed,
+           pattern = coalesce(exercises.pattern, excluded.pattern)
          returning id`,
-        [ex.name, ex.aliases, ex.category, ex.equipment],
+        [ex.name, ex.aliases, ex.category, ex.pattern, ex.equipment],
       );
       const id = Number(rows[0].id);
       exerciseIds.set(ex.name, id);
@@ -233,6 +244,21 @@ async function main() {
             parts.push(`${acc} 3x${sets[0].reps} at ${w}`);
           }
         }
+      }
+
+      // A weekend game, roughly every other Sunday. Occasional on purpose: it should show up in
+      // the catch-all bucket without ever looking like a training block.
+      const playsSport = !offWeek && dow === 0 && chance(0.5);
+      if (playsSport) {
+        const sport = pick(['basketball', 'basketball', 'tennis']);
+        const minutes = Math.round(between(45, 100));
+        plannedWorkouts.push({
+          exercise: sport,
+          // Duration only, no distance — you do not measure a pickup game in miles, and the
+          // dashboard has to cope with a session that carries just one of the two.
+          sets: [{ duration_min: minutes, rpe: between(6, 9) }],
+        });
+        parts.push(`${sport} ${minutes} min`);
       }
 
       if (doesCardio) {

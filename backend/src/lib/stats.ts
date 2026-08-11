@@ -118,8 +118,14 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
            --
            -- Loaded still wins when an exercise has both, so a weighted pull-up is measured by
            -- the weight while its bodyweight sets still count toward the total.
-           case when h.exercise_id is not null then 'weighted'
-                when m.pattern = 'cardio'      then 'endurance'
+           -- Four kinds now. A sport is neither loaded, nor conditioning, nor calisthenics:
+           -- basketball used to fall through to 'bodyweight' and sit between push-ups and
+           -- planks, which is the same misfiling that once put a plank under "cardio".
+           -- coalesce so an exercise with no pattern lands in the catch-all rather than being
+           -- called bodyweight by default.
+           case when h.exercise_id is not null            then 'weighted'
+                when m.pattern = 'cardio'                 then 'endurance'
+                when coalesce(m.pattern, 'other') = 'other' then 'other'
                 else 'bodyweight' end as record_type,
            c.reps              as best_reps,
            c.entry_date::text  as best_reps_on,

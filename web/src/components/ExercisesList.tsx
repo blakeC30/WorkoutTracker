@@ -42,6 +42,7 @@ export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean
   const weighted = shown.filter((r) => r.record_type === 'weighted');
   const bodyweight = shown.filter((r) => r.record_type === 'bodyweight');
   const endurance = shown.filter((r) => r.record_type === 'endurance');
+  const other = shown.filter((r) => r.record_type === 'other');
 
   return (
     <>
@@ -86,6 +87,21 @@ export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean
       {endurance.length > 0 ? (
         <Section label="Cardio" aside={`${endurance.length}`}>
           {endurance.map((row) => (
+            <Endurance key={row.exercise} row={row} />
+          ))}
+        </Section>
+      ) : null}
+
+      {(weighted.length > 0 || bodyweight.length > 0 || endurance.length > 0) && other.length > 0 ? (
+        <Rule />
+      ) : null}
+
+      {/* Sports and anything else without a movement pattern. Its own section because a
+          basketball game is neither a lift, a calisthenic nor conditioning — filed under
+          Bodyweight it sat between push-ups and planks. */}
+      {other.length > 0 ? (
+        <Section label="Sport & other" aside={`${other.length}`}>
+          {other.map((row) => (
             <Endurance key={row.exercise} row={row} />
           ))}
         </Section>
