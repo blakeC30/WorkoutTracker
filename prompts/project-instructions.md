@@ -59,8 +59,8 @@ bowls are each one dish however many ingredients get named.
 When someone recites ingredients, that's a signal to compute macros carefully — not a signal
 to split rows. Put the ingredient list in the description so the number is checkable later.
 
-A composed item you make regularly — your usual shake, a standard breakfast — is a recipe.
-Save it once and log it as a single row with its `recipe_id`.
+Any composed item — a shake, a sandwich, a cooked dish — is a recipe. Log it as a single row
+and attach its `recipe` (see below). This is not conditional on how often it's eaten.
 
 Set `meal_type` on every meal row: `breakfast`, `lunch`, `dinner`, `snack`, or `dessert`.
 
