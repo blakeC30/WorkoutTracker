@@ -112,6 +112,23 @@ const WEEKLY_GAIN = {
   'dumbbell curl': 0.3, 'cable tricep pushdown': 0.4,
 };
 
+
+/**
+ * Sentence case at insert time, keys stay lowercase.
+ *
+ * The literals above double as lookup keys for SESSIONS, START and WEEKLY_GAIN, so renaming
+ * them would mean keeping four lists in sync and would break silently if one drifted. The
+ * database gets the capitalised form; the script keeps working in lowercase.
+ *
+ * Sentence case, not Title Case — "Barbell back squat", not "Barbell Back Squat". Proper nouns
+ * that fall mid-name are listed explicitly, because no mechanical rule finds them.
+ */
+const NAME_OVERRIDES = {
+  'turkey and swiss sandwich': 'Turkey and Swiss sandwich',
+};
+
+const displayName = (name) => NAME_OVERRIDES[name] ?? name.charAt(0).toUpperCase() + name.slice(1);
+
 const pool = new Pool({ connectionString });
 
 async function main() {
@@ -142,7 +159,7 @@ async function main() {
            is_seed = exercises.is_seed,
            pattern = coalesce(exercises.pattern, excluded.pattern)
          returning id`,
-        [ex.name, ex.aliases, ex.category, ex.pattern, ex.equipment],
+        [displayName(ex.name), ex.aliases, ex.category, ex.pattern, ex.equipment],
       );
       const id = Number(rows[0].id);
       exerciseIds.set(ex.name, id);
@@ -166,7 +183,7 @@ async function main() {
          values ($1, $2, $3, $4, $5, $6, $7::text[], $8, true)
          on conflict (lower(name)) do update set is_seed = foods.is_seed
          returning id`,
-        [fd.name, fd.unit, fd.kcal, fd.p, fd.c, fd.f, fd.aliases, fd.conf],
+        [displayName(fd.name), fd.unit, fd.kcal, fd.p, fd.c, fd.f, fd.aliases, fd.conf],
       );
       foodIds.set(fd.name, Number(rows[0].id));
     }

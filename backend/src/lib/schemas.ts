@@ -52,11 +52,19 @@ export const inlineExercise = z.object({
   name: z
     .string()
     .min(1)
-    .describe('Canonical name, e.g. "back squat", "treadmill run". Not "3x5 back squat".'),
+    .describe(
+      'Canonical name for the movement, e.g. "Back squat", "Treadmill run". Not "3x5 back ' +
+        'squat". Write it the way it is normally written: first letter capitalised, the rest ' +
+        'lower case, but keep acronyms and proper nouns as they are — "RDL", "EZ bar curl", ' +
+        '"Bulgarian split squat". Names are stored exactly as given and shown that way.',
+    ),
   aliases: z
     .array(z.string())
     .optional()
-    .describe('Short names the user actually says, e.g. ["squat", "bb squat"].'),
+    .describe(
+      'Short names the user actually says, e.g. ["squat", "bb squat"]. Lower case — these are ' +
+        'match keys, never displayed.',
+    ),
   category: z
     .enum(['strength', 'cardio', 'mobility', 'sport', 'other'])
     .optional(),
@@ -131,8 +139,10 @@ export const inlineFood = z.object({
     .string()
     .min(1)
     .describe(
-      'Short catalog name for the food itself, e.g. "nobu miso black cod", "green beans". ' +
-        'Not a description of this particular serving — no "(side)", no "2 filets".',
+      'Short catalog name for the food itself, e.g. "Nobu miso black cod", "Green beans". ' +
+        'Not a description of this particular serving — no "(side)", no "2 filets". First ' +
+        'letter capitalised, rest lower case, but keep proper nouns as they are — "Greek ' +
+        'yogurt", "Turkey and Swiss sandwich". Stored and shown exactly as given.',
     ),
   unit_label: z
     .string()
@@ -148,7 +158,10 @@ export const inlineFood = z.object({
   aliases: z
     .array(z.string())
     .optional()
-    .describe('Short names to find it by later, e.g. ["black cod", "miso cod"].'),
+    .describe(
+      'Short names to find it by later, e.g. ["black cod", "miso cod"]. Lower case — these ' +
+        'are match keys, never displayed.',
+    ),
   source_url: z.string().optional(),
   confidence: z
     .enum(['high', 'medium', 'low'])
