@@ -39,6 +39,25 @@ cd ../web && npm install && cp .env.example .env.local
 | `npm run dev`     | Local dev server on :3000                                  |
 | `npm run migrate` | Applies any unapplied `.sql` file in `migrations/`. Safe to re-run. |
 
+## The dashboard
+
+Four screens — **Today**, **Week**, **Lifts**, **Food** — built for one device: an iPhone 13
+Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on purpose.
+
+`npm run dev` in `web/` serves it on :3001. It needs the backend running on :3000, since every
+screen fetches from the REST API.
+
+How the secret stays server-side: each screen is a Server Component that calls
+`src/lib/backend.ts`, which begins with `import 'server-only'` — importing it from a Client
+Component is a **build error**, not a code-review catch. Data reaches the two interactive
+components as plain props. Verify with `grep -r "$API_SECRET" web/.next/static` after a
+build; it should return nothing.
+
+Before changing anything visual, read **`web/DESIGN.md`**. It fixes the palette, the two
+typefaces, the spacing scale, and a list of things this codebase deliberately does not do
+(no cards, no gradients, no shadows, no border radius above 2px, no dark-mode toggle). It
+exists so the design stays a decision rather than drifting back to defaults.
+
 ## Changing an MCP tool schema — reconnect the connector
 
 **MCP clients fetch tool definitions once, when the connection is established.** Deploying a

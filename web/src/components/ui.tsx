@@ -1,0 +1,307 @@
+import type { CSSProperties, ReactNode } from 'react';
+
+/*
+ * The vocabulary the screens are built from. All of it renders on the server — none of these
+ * ship a byte of JavaScript.
+ *
+ * Note what is absent: there is no <Card>. Separation is whitespace, then a hairline, then a
+ * background shift, in that order, and it rarely gets past the second.
+ */
+
+/** The screen header: the date on the left, the ISO week on the right. */
+export function Masthead({ left, right }: { left: string; right?: string }) {
+  return (
+    <header
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        // Clears the notch. Without the inset the first line sits under the status bar in
+        // standalone mode, because viewport-fit=cover let us paint up there.
+        paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
+        paddingBottom: 18,
+      }}
+    >
+      <h1 className="cap" style={{ margin: 0, color: 'var(--ink)', fontWeight: 500 }}>
+        {left}
+      </h1>
+      {right ? <span className="cap">{right}</span> : null}
+    </header>
+  );
+}
+
+/** A labelled block. The label is the only uppercase text on the screen. */
+export function Section({
+  label,
+  aside,
+  children,
+}: {
+  label: string;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section style={{ marginBottom: 4 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          marginBottom: 12,
+        }}
+      >
+        <span className="cap">{label}</span>
+        {aside ? <span className="cap">{aside}</span> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function Rule({ tight = false }: { tight?: boolean }) {
+  return <div className={tight ? 'rule rule--tight' : 'rule'} />;
+}
+
+/**
+ * The headline number of a section. Unit is set smaller and dimmer so the digits dominate —
+ * a value and its unit at the same size read as one long string at a glance.
+ */
+export function Figure({
+  value,
+  unit,
+  size = 'var(--t-2xl)',
+  tone = 'var(--ink)',
+}: {
+  value: string;
+  unit?: string;
+  size?: string;
+  tone?: string;
+}) {
+  return (
+    <span className="mono" style={{ color: tone, fontSize: size, fontWeight: 500, lineHeight: 1 }}>
+      {value}
+      {unit ? (
+        <span style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-dim)', marginLeft: 6, fontWeight: 400 }}>
+          {unit}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * A signed change.
+ *
+ * Colour follows DIRECTION, not approval: down is rust because the number went down, not
+ * because down is bad. Bodyweight, calories and volume all move both ways for good reasons,
+ * and an app that decided which was praiseworthy would be wrong half the time.
+ */
+export function Delta({ value, unit, over }: { value: number | null; unit?: string; over?: string }) {
+  if (value === null) return null;
+  const rounded = Math.abs(value) < 0.05 ? 0 : value;
+  const tone = rounded > 0 ? 'var(--up)' : rounded < 0 ? 'var(--down)' : 'var(--ink-faint)';
+  const arrow = rounded > 0 ? '▲' : rounded < 0 ? '▼' : '–';
+  const magnitude = Math.abs(rounded);
+
+  return (
+    <span className="mono" style={{ color: tone, fontSize: 'var(--t-sm)' }}>
+      {arrow} {magnitude.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+      {unit ? ` ${unit}` : ''}
+      {over ? <span style={{ color: 'var(--ink-faint)' }}>{` / ${over}`}</span> : null}
+    </span>
+  );
+}
+
+/**
+ * A horizontal bar row: label, bar, value.
+ *
+ * Two divs and a width percentage. Reaching for a charting library to draw this would ship a
+ * client bundle and a set of defaults to override, for a rectangle.
+ */
+export function BarRow({
+  label,
+  value,
+  max,
+  display,
+  secondary,
+  tone = 'var(--signal)',
+}: {
+  label: string;
+  value: number;
+  max: number;
+  display: string;
+  /** A second, dimmer bar drawn behind the first — secondary muscle volume, in practice. */
+  secondary?: number;
+  tone?: string;
+}) {
+  const pct = max > 0 ? Math.max(value / max, 0) * 100 : 0;
+  const secondaryPct = max > 0 && secondary ? Math.max(secondary / max, 0) * 100 : 0;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '78px 1fr auto', alignItems: 'center', gap: 10, height: 26 }}>
+      <span className="cap" style={{ color: 'var(--ink-dim)', letterSpacing: '0.08em' }}>
+        {label}
+      </span>
+      <div style={{ position: 'relative', height: 10 }}>
+        {secondaryPct > 0 ? (
+          <div
+            style={{
+              position: 'absolute',
+              inset: '0 auto 0 0',
+              width: `${secondaryPct}%`,
+              background: 'var(--signal-low)',
+            }}
+          />
+        ) : null}
+        <div style={{ position: 'absolute', inset: '0 auto 0 0', width: `${pct}%`, background: tone }} />
+      </div>
+      <span className="mono" style={{ fontSize: 'var(--t-sm)', color: 'var(--ink)' }}>
+        {display}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * An inline sparkline, drawn as an SVG path on the server.
+ *
+ * `preserveAspectRatio="none"` lets it stretch to any width while the viewBox stays in data
+ * space, so no measuring and no client JavaScript are needed.
+ */
+export function Sparkline({
+  points,
+  height = 44,
+  tone = 'var(--signal)',
+  fill = true,
+}: {
+  points: number[];
+  height?: number;
+  tone?: string;
+  fill?: boolean;
+}) {
+  if (points.length < 2) return null;
+
+  const W = 100;
+  const H = 30;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  // A flat series would divide by zero; drawing it down the middle is the honest picture.
+  const span = max - min || 1;
+  const step = W / (points.length - 1);
+
+  const coords = points.map((p, i) => [i * step, H - ((p - min) / span) * H] as const);
+  const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+  const area = `${line} L${W},${H} L0,${H} Z`;
+  const [lastX, lastY] = coords[coords.length - 1];
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      style={{ width: '100%', height, display: 'block', overflow: 'visible' }}
+      aria-hidden="true"
+    >
+      {fill ? <path d={area} fill={tone} opacity={0.12} /> : null}
+      <path d={line} fill="none" stroke={tone} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      {/* The current value gets a mark; every other point does not. One focal point.
+          Drawn as a zero-length round-capped LINE rather than a <circle>: the viewBox is
+          stretched unequally by preserveAspectRatio="none", which turns a circle into an
+          ellipse. Stroke geometry escapes that via non-scaling-stroke, so the cap stays round. */}
+      <line
+        x1={lastX}
+        y1={lastY}
+        x2={lastX}
+        y2={lastY}
+        stroke={tone}
+        strokeWidth={5}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Nothing to show, and why.
+ *
+ * On a personal log this is a routine state, not an edge case — every screen looks like this
+ * the day the database is cleared. So it gets a sentence that says what would fill it.
+ */
+export function Empty({ children }: { children: ReactNode }) {
+  return (
+    <p style={{ margin: '4px 0 8px', color: 'var(--ink-faint)', fontSize: 'var(--t-sm)', lineHeight: 1.5 }}>
+      {children}
+    </p>
+  );
+}
+
+/** A section that failed. The rest of the screen still renders. */
+export function Fault({ error }: { error: string }) {
+  return (
+    <div style={{ borderLeft: '2px solid var(--down)', paddingLeft: 12, margin: '4px 0 8px' }}>
+      <div className="cap" style={{ color: 'var(--down)' }}>
+        Unavailable
+      </div>
+      <p className="selectable" style={{ margin: '4px 0 0', color: 'var(--ink-dim)', fontSize: 'var(--t-sm)' }}>
+        {error}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A legend swatch. A drawn box rather than a `■` glyph, whose size and baseline shift with
+ * whatever font happens to have it.
+ */
+export function Swatch({ tone }: { tone: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 7,
+        height: 7,
+        background: tone,
+        marginRight: 5,
+        verticalAlign: 'baseline',
+      }}
+    />
+  );
+}
+
+/** A ledger row: name on the left, measured values on the right. */
+export function Row({
+  name,
+  meta,
+  right,
+  dim = false,
+  style,
+}: {
+  name: ReactNode;
+  meta?: ReactNode;
+  right?: ReactNode;
+  dim?: boolean;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        gap: 14,
+        padding: '11px 0',
+        borderTop: '1px solid var(--rule)',
+        opacity: dim ? 0.55 : 1,
+        ...style,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div className="selectable" style={{ fontSize: 'var(--t-base)', lineHeight: 1.25 }}>
+          {name}
+        </div>
+        {meta ? <div style={{ marginTop: 3 }}>{meta}</div> : null}
+      </div>
+      {right ? <div style={{ textAlign: 'right', flexShrink: 0 }}>{right}</div> : null}
+    </div>
+  );
+}
