@@ -69,11 +69,8 @@ html {
 
 body {
   margin: 0;
-  /* Transparent on purpose. The ground colour lives on <html>, which propagates it to the
-     canvas. If body painted its own background, it would cover the parallax grid: an in-flow
-     block's background paints AFTER negative z-index children in the same stacking context,
-     so the backdrop would be technically present and permanently invisible. */
-  background: transparent;
+  /* No background here: <html> carries the ground colour and propagates it to the canvas,
+     which is the standard behaviour and leaves one place to change it. */
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: var(--t-base);
@@ -330,27 +327,10 @@ button {
   transition: fill 0.18s ease-out;
 }
 
-/* The measurement grid behind everything. Fixed, so it does not scroll with the page; the
-   Backdrop component then slides it at a fraction of the scroll rate, which is what gives the
-   data a plane to sit above. */
-.backdrop {
-  position: fixed;
-  inset: -25% 0 -25% 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--rule) 0 1px,
-    transparent 1px 44px
-  );
-  opacity: 0.32;
-  will-change: transform;
-}
-
 /* Reduced motion is not "faster motion" — it is none.
  *
  * Zeroing durations globally would leave `.reveal` mid-transition and invisible, so the hidden
- * states are explicitly reset rather than rushed, and the parallax layer stops dead. */
+ * states are explicitly reset rather than rushed. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -364,9 +344,5 @@ button {
   .reveal {
     opacity: 1;
     transform: none;
-  }
-
-  .backdrop {
-    transform: none !important;
   }
 }

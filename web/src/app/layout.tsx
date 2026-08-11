@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Azeret_Mono, IBM_Plex_Sans } from 'next/font/google';
 import { TabBar } from '@/components/TabBar';
-import { Backdrop } from '@/components/motion';
 import './globals.css';
 
 /*
@@ -48,7 +47,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${mono.variable} ${sans.variable}`}>
       <body>
-        <Backdrop />
         {children}
         <TabBar />
       </body>

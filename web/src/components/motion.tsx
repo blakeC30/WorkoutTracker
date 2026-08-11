@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 /*
- * The only three pieces of motion that need JavaScript. Bars, sparklines and press states are
+ * The only two pieces of motion that need JavaScript. Bars, sparklines and press states are
  * pure CSS in globals.css — they animate on their own and ship nothing.
  */
 
@@ -63,44 +63,6 @@ export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: n
       {children}
     </div>
   );
-}
-
-/**
- * The measurement grid, moved at a fraction of the scroll rate.
- *
- * This is the app's only parallax and it is deliberately behind everything: depth is the point,
- * not movement. Content sliding at its own speed would make a screen of numbers harder to read,
- * which is the opposite of the job.
- *
- * Driven by rAF off a passive scroll listener rather than by a scroll-linked CSS animation, so
- * it behaves the same on every iOS version instead of only the newest.
- */
-export function Backdrop({ rate = 0.18 }: { rate?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (prefersReducedMotion()) return;
-    const node = ref.current;
-    if (!node) return;
-
-    let frame = 0;
-    const onScroll = () => {
-      if (frame) return; // one write per frame; scroll fires far more often than that
-      frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        node.style.transform = `translate3d(0, ${-window.scrollY * rate}px, 0)`;
-      });
-    };
-
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
-  }, [rate]);
-
-  return <div ref={ref} className="backdrop" aria-hidden="true" />;
 }
 
 /**

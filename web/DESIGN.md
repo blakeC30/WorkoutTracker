@@ -154,16 +154,16 @@ arrival. Things come to rest the way a needle does.
 | Headline figures | Count to value, 900ms, `easeOutQuart` | A gauge powering on. Small values settle from ~97%; totals over 400 sweep from zero, where the sweep is the sense of scale |
 | Sections | Rise 14px + fade on entering view, 60–180ms apart | The only scroll-triggered motion in the app |
 | Tab marker | `translateX`, 340ms | One marker that moves, not four that blink |
-| Backdrop grid | `translateY` at 0.18× scroll | The app's only parallax |
 | Nutrition bars | Fill colour, 180ms, on scrub | The one motion that answers *you* rather than page load |
 
 Rules that constrain all of it:
 
 - **Only `transform`, `opacity`, `stroke-dashoffset` and `fill`.** Never width, height, top or
   left. Nothing animated may cause layout during a scroll.
-- **Parallax goes behind the data, never through it.** The backdrop is a measurement grid at
-  0.18× scroll, giving the numbers a plane to sit above. Content itself never moves at its own
-  speed — a screen of figures sliding around is harder to read, which is the opposite of the job.
+- **Nothing in the background moves, or is there at all.** A parallax measurement grid lived
+  behind the content for a while. It was subtle and it was still wrong: a screen made almost
+  entirely of hairlines and thin bars does not need more horizontal lines behind it, and a
+  static texture competing with the data is a texture that wins. The ground is flat.
 - **Recharts' built-in animation stays off.** It replays on prop change and the scrub handler
   changes props every frame; the bars are animated once from CSS instead.
 - **Correct values are always in the server HTML.** `Counter` rewrites `textContent` on a ref
@@ -171,7 +171,7 @@ Rules that constrain all of it:
 - **A reveal must never be able to hide data.** `Reveal` resolves immediately under reduced
   motion and force-shows itself after 1600ms if the observer never fires.
 - **`prefers-reduced-motion: reduce` means none, not faster.** Hidden states are reset outright
-  and the parallax stops dead; zeroing durations alone would strand `.reveal` at `opacity: 0`.
+  outright; zeroing durations alone would strand `.reveal` at `opacity: 0`.
 
 ## States
 
@@ -196,6 +196,6 @@ above 2px · box-shadows · card outlines · nested cards · dark mode toggle ·
 width · icon libraries · emoji as UI · a chart component for a two-div bar · skeleton shimmer ·
 "Welcome back" copy · congratulating the user on a workout.
 
-And on motion specifically: content parallax (only the backdrop moves) · bounce or spring
+And on motion specifically: parallax of any kind · background texture · bounce or spring
 easing · anything animating `width`/`height`/`top`/`left` · looping or idle animation · hover
 effects (there is no cursor) · an animation that must finish before a number can be read.
