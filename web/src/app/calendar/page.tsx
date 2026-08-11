@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { getCalendar, getWeeks, n, n0, type CalendarRow } from '@/lib/backend';
+import { getCalendar, getMonths, n, n0, type CalendarRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS } from '@/lib/patterns';
-import { WeekLedger } from '@/components/WeekLedger';
+import { Consistency } from '@/components/Consistency';
 import { dec, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +29,7 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
   const key = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : monthKey(today());
   const shape = monthShape(key);
 
-  const [result, weeks] = await Promise.all([getCalendar(shape.from, shape.to), getWeeks(8)]);
+  const [result, months] = await Promise.all([getCalendar(shape.from, shape.to), getMonths(6)]);
 
   return (
     <main className="screen">
@@ -58,13 +58,13 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
             <Totals rows={result.rows} monthKey={key} />
           </Reveal>
 
-          {/* The eight-week ledger, absorbed from what used to be its own tab. Same question as
-              the grid above — have I been consistent — one zoom level out. */}
-          {weeks.ok && weeks.rows.length > 0 ? (
+          {/* The one block on this page that is not scoped to the month above it. Everything
+              else here answers "how was August"; this answers "is the habit holding up". */}
+          {months.ok ? (
             <>
               <Rule />
               <Reveal delay={240}>
-                <WeekLedger weeks={weeks.rows} />
+                <Consistency rows={months.rows} />
               </Reveal>
             </>
           ) : null}

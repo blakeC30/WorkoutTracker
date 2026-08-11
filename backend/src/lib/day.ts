@@ -87,6 +87,57 @@ export async function getCalendar(from: string, to: string) {
 }
 
 /**
+ * Training days per calendar month, for the last N months.
+ *
+ * The one reading in the app that looks past thirty days. Everything else — the month grid, the
+ * coverage matrix, the volume charts, the nutrition history — is scoped to a single month or a
+ * rolling four weeks, so nothing could answer "am I keeping this up" over a season.
+ *
+ * Deliberately ONE number per month. The block this replaced carried volume, sets, calories and
+ * bodyweight per week, every one of which is reported somewhere else in the app, and the result
+ * was the tallest thing on the page saying the least.
+ *
+ * Months with no training are returned as zero rather than omitted: a gap is the most important
+ * thing a consistency view can show, and dropping the row would hide it.
+ */
+export async function getMonthlyConsistency(months = 6) {
+  const sql = getSql();
+
+  return sql`
+    with span as (
+      select date_trunc('month', (now() at time zone ${APP_TIMEZONE})::date)::date as this_month,
+             (now() at time zone ${APP_TIMEZONE})::date as today
+    ),
+    grid as (
+      select generate_series(
+               (select this_month from span) - ((${months}::int - 1) * interval '1 month'),
+               (select this_month from span),
+               interval '1 month')::date as month
+    ),
+    trained as (
+      -- Joined to sets so a workout row with nothing recorded against it cannot count as a
+      -- training day, matching how the calendar decides a day was trained.
+      select date_trunc('month', w.entry_date)::date as month,
+             count(distinct w.entry_date)::int       as training_days
+      from workouts w
+      join workout_sets s on s.workout_id = w.id
+      group by 1
+    )
+    select to_char(g.month, 'YYYY-MM')      as month,
+           coalesce(t.training_days, 0)     as training_days,
+           -- Days of that month that have actually happened: all of them once the month is
+           -- past, only the elapsed part of the current one. Without this the running month
+           -- always looks like a collapse in training.
+           case when g.month = (select this_month from span)
+                then extract(day from (select today from span))::int
+                else extract(day from (g.month + interval '1 month' - interval '1 day'))::int
+           end as days_elapsed
+    from grid g
+    left join trained t on t.month = g.month
+    order by g.month`;
+}
+
+/**
  * When each movement pattern was last trained, and how long ago.
  *
  * Deliberately NOT derived from the calendar rows the grid already has. If you last trained

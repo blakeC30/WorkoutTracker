@@ -105,21 +105,6 @@ export type NutritionRow = {
   items: number;
 };
 
-export type WeekRow = {
-  week_starting: string;
-  training_days: number;
-  exercises_performed: number;
-  total_sets: number;
-  volume_lbs: Num;
-  cardio_miles: Num;
-  cardio_minutes: Num;
-  avg_rpe: Num;
-  avg_calories: Num;
-  avg_protein_g: Num;
-  avg_weight_lbs: Num;
-  weigh_ins: number;
-};
-
 export type PrRow = {
   exercise: string;
   category: string | null;
@@ -187,6 +172,16 @@ export type RecencyRow = {
 };
 
 export const getRecency = () => query<RecencyRow>('/api/stats/recency');
+
+/** Training days per calendar month — the only reading in the app that looks past 30 days. */
+export type MonthRow = {
+  month: string;
+  training_days: number;
+  /** Days of that month that have happened, so a running month is not read as a collapse. */
+  days_elapsed: number;
+};
+
+export const getMonths = (months = 6) => query<MonthRow>('/api/stats/months', { months });
 
 /**
  * Training by pattern. No fan-out here — pattern is one column on the exercise.
@@ -339,6 +334,5 @@ export const getDay = (date: string) => queryOne<DayDetail>('/api/stats/day', { 
 export const getBodyweight = (days = 90) => query<BodyweightRow>('/api/stats/bodyweight', { days });
 export const getMuscles = (days = 28) => query<MuscleRow>('/api/stats/muscles', { days });
 export const getNutrition = (days = 30) => query<NutritionRow>('/api/stats/nutrition', { days });
-export const getWeeks = (weeks = 8) => query<WeekRow>('/api/stats/weekly', { weeks });
 export const getPrs = (limit = 50) => query<PrRow>('/api/stats/prs', { limit });
 export const getReview = (limit = 25) => query<ReviewRow>('/api/stats/review', { limit });
