@@ -31,27 +31,72 @@ export const exerciseName = z
   .transform((s) => s.trim().toLowerCase())
   .describe('Exercise name, e.g. "back squat", "bench press", "running".');
 
-export const workoutInput = z.object({
-  entry_date: entryDate,
-  exercise: exerciseName,
+/** One set. Cardio is a single set carrying distance and/or duration. */
+export const setInput = z.object({
+  reps: z.number().int().positive().optional(),
+  weight_lbs: z.number().nonnegative().optional().describe('Omit for bodyweight work.'),
+  duration_min: z.number().nonnegative().optional(),
+  distance_mi: z.number().nonnegative().optional().describe('Miles. Always record for cardio.'),
+  rpe: z.number().min(1).max(10).optional().describe('Effort for THIS set, 1-10.'),
+  notes: z.string().optional(),
+});
+
+/**
+ * An exercise supplied inline, for movements not yet in the catalog.
+ *
+ * Facts about the movement itself — true every time it is performed. What happened on a
+ * given day belongs in `sets`, not here.
+ */
+export const inlineExercise = z.object({
+  name: z
+    .string()
+    .min(1)
+    .describe('Canonical name, e.g. "back squat", "treadmill run". Not "3x5 back squat".'),
+  aliases: z
+    .array(z.string())
+    .optional()
+    .describe('Short names the user actually says, e.g. ["squat", "bb squat"].'),
   category: z
+    .enum(['strength', 'cardio', 'mobility', 'sport', 'other'])
+    .optional(),
+  equipment: z
     .string()
     .optional()
-    .describe('Broad grouping, e.g. "legs", "push", "pull", "cardio".'),
-  sets: z.number().int().positive().optional(),
-  reps: z.number().int().positive().optional().describe('Reps per set, not total reps.'),
-  weight_lbs: z.number().nonnegative().optional().describe('Omit for bodyweight work.'),
-  duration_min: z.number().nonnegative().optional().describe('For cardio or timed work.'),
-  distance_mi: z
-    .number()
-    .nonnegative()
+    .describe('e.g. "barbell", "dumbbell", "machine", "bodyweight", "treadmill".'),
+  primary_muscles: z
+    .array(z.string())
     .optional()
     .describe(
-      'Distance in miles, for running, walking, rowing, cycling. Always record this when ' +
-        'the user mentions a distance — it is the main measure of cardio volume.',
+      'Muscles this mainly trains, e.g. ["quads", "glutes"]. Use names from list_muscles — ' +
+        'unknown names are rejected so the catalog stays consistent.',
     ),
-  rpe: z.number().min(1).max(10).optional().describe('Rate of perceived exertion, 1-10.'),
+  secondary_muscles: z.array(z.string()).optional(),
   notes: z.string().optional(),
+});
+
+export const workoutInput = z.object({
+  entry_date: entryDate,
+  exercise_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Id from search_exercises. Use whenever a catalogued exercise matches.'),
+  exercise: inlineExercise
+    .optional()
+    .describe(
+      'For a movement not in the catalog. The server adds it and links the workout in one ' +
+        'step. Search first — only supply this when nothing matches.',
+    ),
+  sets: z
+    .array(setInput)
+    .optional()
+    .describe(
+      'One entry PER SET, in the order performed. "3x5 at 225" is three identical entries; ' +
+        '"225x5, 245x3, 265x1" is three different ones. Cardio is a single entry with ' +
+        'distance_mi and/or duration_min. Re-logging an exercise on a day REPLACES its sets.',
+    ),
+  notes: z.string().optional().describe('About the session as a whole.'),
 });
 
 export const bodyweightInput = z.object({
@@ -219,4 +264,16 @@ export const saveFoodInput = inlineFood.extend({
     .positive()
     .optional()
     .describe('Existing food to update. Omit to create or match by name.'),
+});
+
+export const searchExercisesInput = z.object({
+  query: z
+    .string()
+    .optional()
+    .describe('Name, alias or approximate spelling. Omit to list the catalog.'),
+  limit: z.number().int().positive().max(50).default(10).optional(),
+});
+
+export const saveExerciseInput = inlineExercise.extend({
+  exercise_id: z.number().int().positive().optional().describe('Existing exercise to update.'),
 });

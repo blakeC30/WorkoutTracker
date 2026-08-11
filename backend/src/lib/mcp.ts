@@ -1,7 +1,9 @@
+import { z } from 'zod';
 import { createMcpHandler } from 'mcp-handler';
 import {
   getJournalInput,
   getRecentHistoryInput,
+  searchExercisesInput,
   searchFoodsInput,
   logEntryInput,
   saveFoodInput,
@@ -12,6 +14,8 @@ import {
   describeJournal,
   getJournal,
   getRecentHistory,
+  listMuscles,
+  searchExercises,
   searchFoods,
   logEntry,
   saveFood,
@@ -51,7 +55,11 @@ export const mcpHandler = createMcpHandler(
         // immediately rather than three weeks later in a chart.
         const lines: string[] = [];
         for (const w of result.workouts) {
-          lines.push(`  ${w.updated ? 'Updated' : 'Logged'} ${w.exercise} on ${w.entry_date}`);
+          const sets = w.setCount === 1 ? '1 set' : `${w.setCount} sets`;
+          const added = w.exerciseAdded ? ' [new exercise]' : '';
+          lines.push(
+            `  ${w.updated ? 'Updated' : 'Logged'} ${w.exercise}, ${sets} on ${w.entry_date}${added}`,
+          );
         }
         if (result.bodyweight) {
           lines.push(
@@ -141,6 +149,33 @@ export const mcpHandler = createMcpHandler(
       },
     );
     server.registerTool(
+      'search_exercises',
+      {
+        title: 'Search the exercise catalog',
+        description:
+          'Find a movement by name, alias or approximate spelling, with its category and ' +
+          'muscle groups. ALWAYS search before logging a workout: if it is catalogued, log ' +
+          'against its id so the same movement stays one exercise rather than several ' +
+          'spellings. Omit the query to browse everything.',
+        inputSchema: searchExercisesInput,
+      },
+      async ({ query, limit }) => json(await searchExercises(query, limit ?? 10)),
+    );
+
+    server.registerTool(
+      'list_muscles',
+      {
+        title: 'Valid muscle names',
+        description:
+          'The muscle names an exercise can reference, grouped by region. Muscle names are ' +
+          'validated against this list — anything else is rejected — so check here before ' +
+          'adding a new exercise with primary_muscles or secondary_muscles.',
+        inputSchema: z.object({}),
+      },
+      async () => json(await listMuscles()),
+    );
+
+    server.registerTool(
       'search_foods',
       {
         title: 'Search the food catalog',
@@ -176,7 +211,7 @@ export const mcpHandler = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: 'workout-tracker', version: '0.4.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.5.0' },
     instructions:
       'Personal fitness tracker for a single user. When they describe training, food or ' +
       'bodyweight, parse it and call log_entry with both the raw text and the structured ' +
@@ -199,6 +234,13 @@ export const mcpHandler = createMcpHandler(
       '"scoop") — the server catalogues it and links the meal in the same call. Give short ' +
       'aliases so it is easy to find later. Correcting a food fixes every meal ever logged ' +
       'with it.\n\n' +
-      'For cardio, always record distance_mi when a distance is mentioned.',
+      'Workouts work the same way as meals: exercises is a catalog, a workout says the ' +
+      'movement was done that day, and workout_sets records how it went. Call ' +
+      'search_exercises first and log against its id; supply an exercise inline only when ' +
+      'nothing matches, using muscle names from list_muscles.\n\n' +
+      'Give ONE entry in `sets` per set actually performed. "3x5 at 225" is three identical ' +
+      'entries; "225x5, 245x3, 265x1" is three different ones. Cardio is a single entry ' +
+      'carrying distance_mi and/or duration_min — always record distance when mentioned. ' +
+      'Re-logging an exercise on a day replaces that day\'s sets.',
   },
 );

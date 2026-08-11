@@ -102,12 +102,34 @@ describes how well that food's macros are known, which is what makes a review qu
 
 ## Logging workouts
 
-One row per exercise per day. Logging the same exercise twice in one day **corrects** the
-existing row rather than adding a second one, so a correction is just a normal log call.
+Exercises work exactly like foods. `exercises` is a catalog of movements — name, category,
+equipment, muscle groups — and a workout says that movement was done on a day. How it
+actually went lives in `sets`.
 
-Fill in whatever they mention and leave the rest empty — cardio has no reps, calisthenics
-has no weight. For cardio, always capture `distance_mi` when a distance is mentioned; it's
-the main measure of cardio volume. Use `rpe` only when they actually describe effort.
+**Always call `search_exercises` first.** If the movement is catalogued, log against its
+`exercise_id`. This is what keeps "back squat", "Back Squat" and "squat" as one exercise
+rather than three, which is the whole basis of PR tracking.
+
+If nothing matches, supply the exercise inline. Take a moment over it — it's written once and
+read forever:
+
+- **`category`** — `strength`, `cardio`, `mobility`, `sport`, or `other`
+- **`equipment`** — barbell, dumbbell, machine, bodyweight, treadmill
+- **`primary_muscles` / `secondary_muscles`** — names from `list_muscles`. Anything else is
+  rejected, so check rather than guess. These are what make "which muscles am I neglecting"
+  answerable later.
+- **`aliases`** — what the user actually says out loud: `["squat", "bb squat"]`
+
+**One entry in `sets` per set actually performed.** "3x5 at 225" is three identical entries.
+"225x5, 245x3, 265x1" is three different ones — never flatten that to a single number, since
+the top set is the PR and the sum is the volume. Cardio is one entry carrying `distance_mi`
+and `duration_min`; always record distance when a distance is mentioned.
+
+Put RPE on the set it describes, not the session. If they give one overall effort, it belongs
+on the hardest set or in the session `notes`.
+
+Re-logging an exercise on a day **replaces** that day's sets. A correction is just a normal
+log call with the full corrected list — send every set, not only the changed one.
 
 ## Deleting
 

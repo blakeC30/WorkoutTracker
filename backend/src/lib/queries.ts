@@ -29,7 +29,13 @@ function getPool(): Pool {
 
 export type LogEntryResult = {
   journalId: number;
-  workouts: Array<{ exercise: string; entry_date: string; updated: boolean }>;
+  workouts: Array<{
+    exercise: string;
+    entry_date: string;
+    updated: boolean;
+    setCount: number;
+    exerciseAdded: boolean;
+  }>;
   bodyweight: { entry_date: string; weight_lbs: number } | null;
   meals: Array<{
     description: string;
@@ -70,36 +76,99 @@ export async function logEntry(
 
     const workouts: LogEntryResult['workouts'] = [];
     for (const w of input.workouts ?? []) {
-      // One workout row per exercise per day. Logging the same exercise twice in one day
-      // corrects the existing row rather than duplicating it or erroring. `xmax = 0` is a
-      // Postgres trick for telling an INSERT apart from an UPDATE in the same statement:
-      // it's 0 only for a freshly inserted row.
-      const { rows } = await client.query<{ inserted: boolean }>(
-        `insert into workouts
-           (journal_id, entry_date, exercise, category, sets, reps,
-            weight_lbs, duration_min, distance_mi, rpe, notes)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         on conflict (entry_date, exercise) do update set
-           journal_id   = excluded.journal_id,
-           category     = coalesce(excluded.category,     workouts.category),
-           sets         = coalesce(excluded.sets,         workouts.sets),
-           reps         = coalesce(excluded.reps,         workouts.reps),
-           weight_lbs   = coalesce(excluded.weight_lbs,   workouts.weight_lbs),
-           duration_min = coalesce(excluded.duration_min, workouts.duration_min),
-           distance_mi  = coalesce(excluded.distance_mi,  workouts.distance_mi),
-           rpe          = coalesce(excluded.rpe,          workouts.rpe),
-           notes        = coalesce(excluded.notes,        workouts.notes)
-         returning (xmax = 0) as inserted`,
-        [
-          journalId, w.entry_date, w.exercise, w.category ?? null, w.sets ?? null,
-          w.reps ?? null, w.weight_lbs ?? null, w.duration_min ?? null,
-          w.distance_mi ?? null, w.rpe ?? null, w.notes ?? null,
-        ],
+      let exerciseId = w.exercise_id ?? null;
+      let savedExercise: { id: number; name: string; created: boolean } | undefined;
+
+      if (w.exercise) {
+        const ex = w.exercise;
+        const { rows } = await client.query<{ id: string; name: string; created: boolean }>(
+          `insert into exercises (name, aliases, category, equipment, notes)
+           values ($1, coalesce($2::text[],'{}'), $3, $4, $5)
+           on conflict (name) do update set
+             aliases   = (select coalesce(array_agg(distinct a), '{}')
+                          from unnest(exercises.aliases || excluded.aliases) a),
+             category  = coalesce(excluded.category,  exercises.category),
+             equipment = coalesce(excluded.equipment, exercises.equipment),
+             notes     = coalesce(excluded.notes,     exercises.notes),
+             updated_at = now()
+           returning id, name, (xmax = 0) as created`,
+          [ex.name.trim(), ex.aliases ?? null, ex.category ?? null, ex.equipment ?? null, ex.notes ?? null],
+        );
+        exerciseId = Number(rows[0].id);
+        savedExercise = { id: exerciseId, name: rows[0].name, created: rows[0].created };
+
+        // Muscle names are resolved against the lookup table. An unknown name is rejected
+        // rather than silently dropped — that is the whole reason muscles is normalized.
+        for (const [role, names] of [
+          ['primary', ex.primary_muscles ?? []],
+          ['secondary', ex.secondary_muscles ?? []],
+        ] as const) {
+          for (const raw of names) {
+            const name = raw.trim().toLowerCase();
+            const { rows: mrows } = await client.query<{ id: string }>(
+              'select id from muscles where lower(name) = $1',
+              [name],
+            );
+            if (mrows.length === 0) {
+              throw new Error(
+                `Unknown muscle "${raw}". Call list_muscles for the valid names.`,
+              );
+            }
+            await client.query(
+              `insert into exercise_muscles (exercise_id, muscle_id, role)
+               values ($1, $2, $3)
+               on conflict (exercise_id, muscle_id) do update set role = excluded.role`,
+              [exerciseId, mrows[0].id, role],
+            );
+          }
+        }
+      }
+
+      if (exerciseId === null) {
+        throw new Error(
+          'A workout has neither exercise_id nor exercise. Every workout must point at an ' +
+            'exercise — search_exercises first, and supply one inline if nothing matches.',
+        );
+      }
+
+      // One workout row per exercise per day; logging it again corrects that day.
+      const { rows: wrows } = await client.query<{ id: string; name: string; inserted: boolean }>(
+        `insert into workouts (journal_id, entry_date, exercise_id, notes)
+         values ($1, $2, $3, $4)
+         on conflict (entry_date, exercise_id) do update set
+           journal_id = excluded.journal_id,
+           notes      = coalesce(excluded.notes, workouts.notes)
+         returning id, (xmax = 0) as inserted,
+                   (select name from exercises where id = $3) as name`,
+        [journalId, w.entry_date, exerciseId, w.notes ?? null],
       );
+      const workoutId = Number(wrows[0].id);
+
+      // Sets are REPLACED, not appended. Re-logging a day's squats means the new list is
+      // what happened — appending would silently double the volume of a correction.
+      if (w.sets && w.sets.length > 0) {
+        await client.query('delete from workout_sets where workout_id = $1', [workoutId]);
+        let n = 0;
+        for (const s of w.sets) {
+          n += 1;
+          await client.query(
+            `insert into workout_sets
+               (workout_id, set_number, reps, weight_lbs, duration_min, distance_mi, rpe, notes)
+             values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              workoutId, n, s.reps ?? null, s.weight_lbs ?? null, s.duration_min ?? null,
+              s.distance_mi ?? null, s.rpe ?? null, s.notes ?? null,
+            ],
+          );
+        }
+      }
+
       workouts.push({
-        exercise: w.exercise,
+        exercise: wrows[0].name,
         entry_date: w.entry_date,
-        updated: !rows[0].inserted,
+        updated: !wrows[0].inserted,
+        setCount: w.sets?.length ?? 0,
+        exerciseAdded: savedExercise?.created ?? false,
       });
     }
 
@@ -133,7 +202,7 @@ export async function logEntry(
           `insert into foods
              (name, unit_label, calories, protein_g, carbs_g, fat_g, aliases, source_url,
               confidence, notes)
-           values ($1, coalesce($2,'serving'), $3, $4, $5, $6, coalesce($7,'{}'), $8, $9, $10)
+           values ($1, coalesce($2,'serving'), $3, $4, $5, $6, coalesce($7::text[],'{}'), $8, $9, $10)
            on conflict (name) do update set
              unit_label = coalesce(excluded.unit_label, foods.unit_label),
              calories   = coalesce(excluded.calories,   foods.calories),
@@ -206,11 +275,24 @@ export async function getRecentHistory(days: number) {
   const sql = getSql();
 
   const [workouts, bodyweight, meals] = await Promise.all([
-    sql`select entry_date::text as entry_date, exercise, category, sets, reps, weight_lbs,
-               duration_min, distance_mi, rpe, notes
-        from workouts
-        where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
-        order by entry_date desc, exercise asc`,
+    sql`select w.entry_date::text as entry_date, e.name as exercise, e.category, w.notes,
+               count(s.id)::int as set_count,
+               max(s.weight_lbs) as top_weight_lbs,
+               sum(s.reps) as total_reps,
+               sum(s.weight_lbs * s.reps) as volume_lbs,
+               sum(s.distance_mi) as distance_mi,
+               sum(s.duration_min) as duration_min,
+               max(s.rpe) as top_rpe,
+               coalesce(json_agg(json_build_object(
+                 'set', s.set_number, 'reps', s.reps, 'weight_lbs', s.weight_lbs,
+                 'distance_mi', s.distance_mi, 'duration_min', s.duration_min, 'rpe', s.rpe
+               ) order by s.set_number) filter (where s.id is not null), '[]') as sets
+        from workouts w
+        join exercises e on e.id = w.exercise_id
+        left join workout_sets s on s.workout_id = w.id
+        where w.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+        group by w.id, w.entry_date, e.name, e.category, w.notes
+        order by w.entry_date desc, e.name`,
     sql`select entry_date::text as entry_date, weight_lbs, notes
         from bodyweight
         where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
@@ -255,9 +337,13 @@ export async function describeJournal(journalId: number) {
   if (!journal) return null;
 
   const [workouts, bodyweight, meals] = await Promise.all([
-    sql`select entry_date::text as entry_date, exercise, sets, reps, weight_lbs,
-               duration_min, distance_mi
-        from workouts where journal_id = ${journalId} order by exercise`,
+    sql`select w.entry_date::text as entry_date, e.name as exercise,
+               count(s.id)::int as set_count
+        from workouts w
+        join exercises e on e.id = w.exercise_id
+        left join workout_sets s on s.workout_id = w.id
+        where w.journal_id = ${journalId}
+        group by w.id, w.entry_date, e.name order by e.name`,
     sql`select entry_date::text as entry_date, weight_lbs from bodyweight where journal_id = ${journalId}`,
     sql`select m.entry_date::text as entry_date, m.meal_type, f.name as description,
                m.servings, round(f.calories * m.servings) as calories
@@ -361,4 +447,45 @@ export async function saveFood(input: {
       updated_at = now()
     returning id, name, (xmax = 0) as created`;
   return { id: Number(row.id), name: row.name as string, created: row.created as boolean };
+}
+
+/** Fuzzy exercise search — same ranking as searchFoods. */
+export async function searchExercises(query?: string, limit = 10) {
+  const sql = getSql();
+  const q = query?.trim().toLowerCase() ?? '';
+  const base = sql`
+    select e.id, e.name, e.aliases, e.category, e.equipment,
+           coalesce(json_agg(json_build_object('muscle', m.name, 'region', m.region, 'role', em.role)
+                    order by em.role, m.name) filter (where m.id is not null), '[]') as muscles
+    from exercises e
+    left join exercise_muscles em on em.exercise_id = e.id
+    left join muscles m on m.id = em.muscle_id
+    group by e.id order by e.name limit ${limit}`;
+  if (!q) return base;
+
+  return sql`
+    select e.id, e.name, e.aliases, e.category, e.equipment,
+           coalesce(json_agg(json_build_object('muscle', m.name, 'region', m.region, 'role', em.role)
+                    order by em.role, m.name) filter (where m.id is not null), '[]') as muscles,
+           greatest(
+             case when ${q} = any (select lower(a) from unnest(e.aliases) a) then 1.0 else 0 end,
+             case when lower(e.name) like ${'%' + q + '%'} then 0.9 else 0 end,
+             similarity(lower(e.name), ${q})
+           ) as score
+    from exercises e
+    left join exercise_muscles em on em.exercise_id = e.id
+    left join muscles m on m.id = em.muscle_id
+    where lower(e.name) like ${'%' + q + '%'}
+       or ${q} = any (select lower(a) from unnest(e.aliases) a)
+       or similarity(lower(e.name), ${q}) > 0.2
+    group by e.id
+    order by score desc, e.name
+    limit ${limit}`;
+}
+
+/** The valid muscle names, so the model can pick from them rather than inventing. */
+export async function listMuscles() {
+  const sql = getSql();
+  return sql`select region, array_agg(name order by name) as muscles
+             from muscles group by region order by region`;
 }
