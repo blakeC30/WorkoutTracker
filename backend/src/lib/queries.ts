@@ -31,7 +31,11 @@ export type LogEntryResult = {
   journalId: number;
   workouts: Array<{ exercise: string; entry_date: string; updated: boolean }>;
   bodyweight: { entry_date: string; weight_lbs: number } | null;
-  meals: Array<{ description: string; entry_date: string }>;
+  meals: Array<{
+    description: string;
+    entry_date: string;
+    recipe?: { id: number; name: string; created: boolean };
+  }>;
 };
 
 /**
@@ -116,6 +120,55 @@ export async function logEntry(
 
     const meals: LogEntryResult['meals'] = [];
     for (const m of input.meals ?? []) {
+      let recipeId = m.recipe_id ?? null;
+      let savedRecipe: { id: number; name: string; created: boolean } | undefined;
+
+      // A recipe supplied inline is saved here, in the same transaction as the meal, so
+      // logging a dish from a recipe is a single tool call. Matching is by name, so
+      // cooking the same dish again updates that recipe rather than duplicating it.
+      if (m.recipe) {
+        const r = m.recipe;
+        const { rows } = await client.query<{ id: string; name: string; created: boolean }>(
+          `insert into recipes
+             (name, source_url, servings, calories, protein_g, carbs_g, fat_g, notes)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)
+           on conflict (name) do update set
+             source_url = coalesce(excluded.source_url, recipes.source_url),
+             servings   = coalesce(excluded.servings,   recipes.servings),
+             calories   = coalesce(excluded.calories,   recipes.calories),
+             protein_g  = coalesce(excluded.protein_g,  recipes.protein_g),
+             carbs_g    = coalesce(excluded.carbs_g,    recipes.carbs_g),
+             fat_g      = coalesce(excluded.fat_g,      recipes.fat_g),
+             notes      = coalesce(excluded.notes,      recipes.notes),
+             updated_at = now()
+           returning id, name, (xmax = 0) as created`,
+          [
+            r.name.trim(), r.source_url ?? null, r.yields_servings ?? null,
+            r.calories ?? null, r.protein_g ?? null, r.carbs_g ?? null,
+            r.fat_g ?? null, r.notes ?? null,
+          ],
+        );
+        recipeId = Number(rows[0].id);
+        savedRecipe = {
+          id: recipeId,
+          name: rows[0].name,
+          created: rows[0].created,
+        };
+      }
+
+      // Macros are derived from the recipe only when the model did not supply them, and the
+      // result is COPIED onto the row. Nothing is read back through recipe_id later, so
+      // refining a recipe never rewrites a meal already eaten.
+      const eaten = m.servings ?? 1;
+      const perServing = m.recipe;
+      const derive = (own: number | undefined, per: number | undefined) =>
+        own ?? (perServing && per !== undefined ? Math.round(per * eaten) : null);
+
+      const calories = derive(m.calories, perServing?.calories);
+      const protein = derive(m.protein_g, perServing?.protein_g);
+      const carbs = derive(m.carbs_g, perServing?.carbs_g);
+      const fat = derive(m.fat_g, perServing?.fat_g);
+
       // No uniqueness constraint on meals — several meals a day is normal.
       await client.query(
         `insert into meals
@@ -124,12 +177,11 @@ export async function logEntry(
          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           journalId, m.entry_date, m.meal_type ?? null, m.description,
-          m.recipe_id ?? null, m.servings ?? null, m.calories ?? null,
-          m.protein_g ?? null, m.carbs_g ?? null, m.fat_g ?? null,
+          recipeId, m.servings ?? null, calories, protein, carbs, fat,
           m.confidence ?? null,
         ],
       );
-      meals.push({ description: m.description, entry_date: m.entry_date });
+      meals.push({ description: m.description, entry_date: m.entry_date, recipe: savedRecipe });
     }
 
     await client.query('commit');

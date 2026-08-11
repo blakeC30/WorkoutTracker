@@ -59,7 +59,10 @@ export const mcpHandler = createMcpHandler(
           );
         }
         for (const m of result.meals) {
-          lines.push(`  Meal "${m.description}" on ${m.entry_date}`);
+          const recipeNote = m.recipe
+            ? ` [${m.recipe.created ? 'saved' : 'updated'} recipe #${m.recipe.id} "${m.recipe.name}"]`
+            : '';
+          lines.push(`  Meal "${m.description}" on ${m.entry_date}${recipeNote}`);
         }
         if (lines.length === 0) {
           lines.push('  (journal text only — nothing structured was parsed out of it)');
@@ -184,10 +187,12 @@ export const mcpHandler = createMcpHandler(
       'meal. Set meal_type on every meal row.\n\n' +
       'Before estimating macros for a dish, call list_recipes. If it is saved, use its ' +
       'macros and recipe_id instead of guessing.\n\n' +
-      'If it is not saved and you work out per-serving macros for it, call save_recipe and ' +
-      'then log the meal with the returned recipe_id and servings. Do not ask first — ' +
-      'deriving a recipe and not saving it discards the only expensive part of the work, ' +
-      'and the next meal from that dish starts from scratch.\n\n' +
+      'If it is not saved and you work out per-serving macros for it, put them in the ' +
+      'meal\'s `recipe` field when you call log_entry, with `servings` set to how many were ' +
+      'eaten. The server saves the recipe and links the meal in one step — no separate ' +
+      'save_recipe call is needed. Deriving a recipe without recording it means the same ' +
+      'dish gets re-estimated every time, and estimates of the same dish have varied by ' +
+      'more than half.\n\n' +
       'For cardio, always record distance_mi when a distance is mentioned.',
   },
 );

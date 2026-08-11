@@ -60,6 +60,36 @@ export const bodyweightInput = z.object({
   notes: z.string().optional(),
 });
 
+/**
+ * A recipe supplied inline with a meal.
+ *
+ * This exists so logging a dish from a recipe is ONE tool call. Relying on the model to
+ * follow up with a separate save_recipe call did not work in practice — it derived correct
+ * per-serving macros and then dropped them, twice, with the instruction stated explicitly
+ * in both the project prompt and the server's own instructions. The same dish came back
+ * 60% apart on consecutive days as a result.
+ *
+ * Filling in a field of a payload you are already sending is far more reliable than
+ * remembering a second action, so the server does the saving.
+ */
+export const inlineRecipe = z.object({
+  name: z
+    .string()
+    .min(1)
+    .describe('Short identifying name, e.g. "miso black cod". Reused to match existing recipes.'),
+  source_url: z.string().optional().describe('Where the recipe came from, if anywhere.'),
+  yields_servings: z
+    .number()
+    .positive()
+    .optional()
+    .describe('How many servings the whole recipe makes — not how many were eaten.'),
+  calories: z.number().int().nonnegative().optional().describe('PER SERVING, not per batch.'),
+  protein_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+  carbs_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+  fat_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+  notes: z.string().optional(),
+});
+
 export const mealInput = z.object({
   entry_date: entryDate,
   meal_type: z
@@ -78,7 +108,15 @@ export const mealInput = z.object({
     .int()
     .positive()
     .optional()
-    .describe('If this came from a saved recipe, its id from list_recipes.'),
+    .describe('If this came from an ALREADY-saved recipe, its id from list_recipes.'),
+  recipe: inlineRecipe
+    .optional()
+    .describe(
+      'If this dish comes from a recipe that is NOT already saved, put it here with ' +
+        'per-serving macros. The server saves it and links this meal automatically — you do ' +
+        'not need a separate save_recipe call. Set servings to how many were eaten and the ' +
+        'server computes this row\'s macros from the per-serving numbers.',
+    ),
   servings: z
     .number()
     .positive()
