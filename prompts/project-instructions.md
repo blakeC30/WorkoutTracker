@@ -1,8 +1,23 @@
-# Claude Project instructions
+# Claude Project setup
 
-Paste this into the **Project instructions** field of the Claude project you log workouts
-from. It is version-controlled here so changes to how logging behaves are reviewable
-alongside the code that stores the data.
+Both fields of the Claude project you log workouts from. They're version-controlled here so
+changes to how logging behaves are reviewable alongside the code that stores the data.
+
+## Project description
+
+Paste into the project's **description** field:
+
+```
+Personal fitness log. I describe workouts, meals, and bodyweight in plain
+language; Claude parses them and writes them to my Postgres database through
+the WorkoutTracker connector. Dates are when things happened, not when I
+logged them. Meals are stored one row per component so sides can be
+recombined, and recipes are saved once so their macros aren't re-estimated.
+```
+
+## Project instructions
+
+Paste everything below the horizontal rule into the **Project instructions** field.
 
 > Two layers of instruction reach the model, and they do different jobs. The MCP server
 > sends `instructions` (see `backend/src/lib/mcp.ts`) on every connection — those describe
