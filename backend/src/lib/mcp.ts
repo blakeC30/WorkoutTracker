@@ -176,9 +176,12 @@ export const mcpHandler = createMcpHandler(
       'data.\n\n' +
       'Dates are when things HAPPENED: "yesterday I squatted" is a workout dated yesterday, ' +
       'not today.\n\n' +
-      'Log one meal row per COMPONENT, not per meal. A dinner of cod, green beans, rice and ' +
-      'salad is four rows sharing an entry_date and meal_type — never one lumped row. Set ' +
-      'meal_type on every meal row.\n\n' +
+      'Log one meal row per DISH — not per meal, and not per ingredient. A dinner of cod, ' +
+      'green beans, rice and salad is four rows sharing an entry_date and meal_type. But a ' +
+      'protein shake of milk, banana and two scoops of powder is ONE row: those are ' +
+      'ingredients, listed so you can compute macros, not separate things eaten. The test ' +
+      'is whether an item could have been swapped out without changing the rest of the ' +
+      'meal. Set meal_type on every meal row.\n\n' +
       'Before estimating macros for a dish, call list_recipes. If it is saved, use its ' +
       'macros and recipe_id instead of guessing.\n\n' +
       'If it is not saved and you work out per-serving macros for it, call save_recipe and ' +

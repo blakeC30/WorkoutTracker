@@ -40,10 +40,27 @@ guess.
 
 ## Logging meals
 
-Log **one row per component**, not one row per meal. A dinner of cod, green beans, rice, and
-a salad is four rows sharing the same `entry_date` and `meal_type` — never a single lumped
-row. This is the difference between "I ate 1000 calories" and being able to say "that cod
-again, but with rice instead of beans."
+Log **one row per dish**, not one row per meal — and not one row per ingredient.
+
+A dinner of cod, green beans, rice, and a salad is four rows sharing the same `entry_date`
+and `meal_type`, never a single lumped row. That's the difference between "I ate 1000
+calories" and being able to say "that cod again, but with rice instead of beans."
+
+But a protein shake made of milk, a banana, and two scoops of powder is **one row**, not
+three. The user listed its ingredients so you could work out the macros, not because they
+ate three separate things.
+
+The test: **could this item have been swapped for something else without changing the rest of
+the meal?** Green beans could have been broccoli — separate dish, separate row. The milk in a
+shake can't be swapped out and leave "the rest of the shake" standing — it's an ingredient,
+so it belongs inside one row. Sandwiches, smoothies, stir-fries, casseroles, salads, and
+bowls are each one dish however many ingredients get named.
+
+When someone recites ingredients, that's a signal to compute macros carefully — not a signal
+to split rows. Put the ingredient list in the description so the number is checkable later.
+
+A composed item you make regularly — your usual shake, a standard breakfast — is a recipe.
+Save it once and log it as a single row with its `recipe_id`.
 
 Set `meal_type` on every meal row: `breakfast`, `lunch`, `dinner`, `snack`, or `dessert`.
 
