@@ -32,41 +32,64 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
   const term = opts.exercise ? `%${opts.exercise.trim().toLowerCase()}%` : null;
 
   return sql`
-    with sets as (
+    with matched as (
       select e.id as exercise_id, e.name as exercise, e.category,
-             w.entry_date, s.reps, s.weight_lbs,
-             -- Epley. Meaningless past ~12 reps, so high-rep sets are excluded below.
-             s.weight_lbs * (1 + s.reps::numeric / 30) as e1rm
+             w.entry_date, s.reps, s.weight_lbs, s.distance_mi, s.duration_min
       from workout_sets s
       join workouts w  on w.id = s.workout_id
       join exercises e on e.id = w.exercise_id
-      where s.weight_lbs is not null and s.reps is not null and s.reps <= 12
-        and (${term}::text is null or lower(e.name) like ${term})
+      where (${term}::text is null or lower(e.name) like ${term})
+    ),
+    -- Loaded work: heaviest set and best estimated max.
+    weighted as (
+      select exercise_id, entry_date, reps, weight_lbs,
+             weight_lbs * (1 + reps::numeric / 30) as e1rm
+      from matched
+      where weight_lbs is not null and reps is not null and reps <= 12
     ),
     heaviest as (
       select distinct on (exercise_id) exercise_id, weight_lbs, reps, entry_date
-      from sets order by exercise_id, weight_lbs desc, reps desc, entry_date asc
+      from weighted order by exercise_id, weight_lbs desc, reps desc, entry_date asc
     ),
     best_e1rm as (
       select distinct on (exercise_id) exercise_id, e1rm, weight_lbs, reps, entry_date
-      from sets order by exercise_id, e1rm desc, entry_date asc
+      from weighted order by exercise_id, e1rm desc, entry_date asc
+    ),
+    -- Unloaded work: cardio and timed holds. Without this, running, rowing and planks have
+    -- no record of any kind and simply vanish from the list — the longest run of the block
+    -- is as much a PR as the heaviest single.
+    endurance as (
+      select exercise_id,
+             max(distance_mi)  as best_distance_mi,
+             max(duration_min) as best_duration_min,
+             min(case when distance_mi > 0 and duration_min > 0
+                      then duration_min / distance_mi end) as best_pace_min_per_mi
+      from matched
+      where distance_mi is not null or duration_min is not null
+      group by exercise_id
     )
-    select s.exercise, s.category,
-           h.weight_lbs           as heaviest_lbs,
-           h.reps                 as heaviest_reps,
-           h.entry_date::text     as heaviest_on,
-           round(b.e1rm)          as best_e1rm_lbs,
-           b.weight_lbs           as best_e1rm_weight,
-           b.reps                 as best_e1rm_reps,
-           b.entry_date::text     as best_e1rm_on,
-           count(*)::int          as total_sets,
-           max(s.entry_date)::text as last_performed
-    from sets s
-    join heaviest  h on h.exercise_id = s.exercise_id
-    join best_e1rm b on b.exercise_id = s.exercise_id
-    group by s.exercise, s.category, h.weight_lbs, h.reps, h.entry_date,
-             b.e1rm, b.weight_lbs, b.reps, b.entry_date
-    order by max(s.entry_date) desc
+    select m.exercise, m.category,
+           case when h.exercise_id is not null then 'weighted' else 'endurance' end as record_type,
+           h.weight_lbs        as heaviest_lbs,
+           h.reps              as heaviest_reps,
+           h.entry_date::text  as heaviest_on,
+           round(b.e1rm)       as best_e1rm_lbs,
+           b.weight_lbs        as best_e1rm_weight,
+           b.reps              as best_e1rm_reps,
+           b.entry_date::text  as best_e1rm_on,
+           en.best_distance_mi,
+           en.best_duration_min,
+           round(en.best_pace_min_per_mi, 2) as best_pace_min_per_mi,
+           count(*)::int           as total_sets,
+           max(m.entry_date)::text as last_performed
+    from matched m
+    left join heaviest  h  on h.exercise_id  = m.exercise_id
+    left join best_e1rm b  on b.exercise_id  = m.exercise_id
+    left join endurance en on en.exercise_id = m.exercise_id
+    group by m.exercise, m.category, h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
+             b.e1rm, b.weight_lbs, b.reps, b.entry_date,
+             en.best_distance_mi, en.best_duration_min, en.best_pace_min_per_mi
+    order by max(m.entry_date) desc
     limit ${limit}`;
 }
 
@@ -164,8 +187,18 @@ export async function getBodyweightTrend(days = 90) {
   return sql`
     select entry_date::text as date,
            weight_lbs,
-           round(avg(weight_lbs) over (order by entry_date rows between 6 preceding and current row), 1)
-             as rolling_7d
+           -- RANGE over an interval, not ROWS. With missed weigh-ins a 6-row window reaches
+           -- back however far those rows happen to span — on this history, up to ten days —
+           -- so it silently stops being a seven-day average exactly when weighing is
+           -- irregular, which is when the smoothing matters most.
+           round(avg(weight_lbs) over (
+             order by entry_date
+             range between interval '6 days' preceding and current row
+           ), 1) as rolling_7d,
+           count(*) over (
+             order by entry_date
+             range between interval '6 days' preceding and current row
+           )::int as days_in_window
     from bodyweight
     where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
     order by entry_date`;
@@ -192,17 +225,22 @@ export async function getVolumeByMuscle(days = 28) {
       group by w.id, w.exercise_id
     ),
     exercise_regions as (
-      select distinct em.exercise_id, m.region
+      select distinct em.exercise_id, m.region, em.role
       from exercise_muscles em join muscles m on m.id = em.muscle_id
-      where em.role = 'primary'
     )
+    -- Primary and secondary are reported separately rather than blended. Any single number
+    -- would need a made-up weighting for how much a secondary muscle really works, and the
+    -- honest answer is that it depends on the movement. Splitting them lets the reader
+    -- decide, and stops 22 recorded secondary links from being silently discarded.
     select r.region,
-           round(sum(v.volume))       as volume_lbs,
-           count(distinct v.id)::int  as sessions
+           round(sum(v.volume) filter (where r.role = 'primary'))   as primary_volume_lbs,
+           round(sum(v.volume) filter (where r.role = 'secondary')) as secondary_volume_lbs,
+           count(distinct v.id) filter (where r.role = 'primary')::int   as primary_sessions,
+           count(distinct v.id) filter (where r.role = 'secondary')::int as secondary_sessions
     from workout_volume v
     join exercise_regions r on r.exercise_id = v.exercise_id
     group by r.region
-    order by volume_lbs desc nulls last`;
+    order by primary_volume_lbs desc nulls last`;
 }
 
 /**
