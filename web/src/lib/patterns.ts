@@ -2,7 +2,7 @@
  * The movement patterns and their colours, in one place.
  *
  * Every screen that shows a pattern imports this, so a colour can never mean push on the
- * calendar and pull on the lifts list. The order is fixed and load-bearing: it is the order of
+ * calendar and pull on the exercises list. The order is fixed and load-bearing: it is the order of
  * the slots in a calendar square, and those slots are readable at 6px only because position
  * never changes.
  *

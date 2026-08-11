@@ -41,10 +41,10 @@ cd ../web && npm install && cp .env.example .env.local
 
 ## The dashboard
 
-Four screens — **Today**, **History**, **Lifts**, **Food** — built for one device: an iPhone 13
+Four screens — **Today**, **History**, **Exercises**, **Food** — built for one device: an iPhone 13
 Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on purpose.
 
-One question per tab: *now / over time / lifts / food*. There used to be a fifth, Week, whose
+One question per tab: *now / over time / exercises / food*. There used to be a fifth, Week, whose
 eight-week ledger answered the same question as the month grid at a different zoom; it now sits
 below that grid on History instead.
 
@@ -53,13 +53,20 @@ only thing on the screen that says what to *do*. Volume below it is grouped by p
 patterns with no tonnage — cardio, planks — are reported in minutes and miles rather than
 dropped, since a bar chart silently omitting core reads as "you have not trained it".
 
-**Lifts** → tapping any exercise opens its full history: estimated 1RM over every session, the
-sets of each one, and volume per session. Nothing else in the app can distinguish a lift that
-added 40lb last month from one stalled since June.
+**Exercises** is the `exercises` catalog with a record and a trend on each — the counterpart to
+the Food tab, which browses the other catalog. It splits into Loaded, Bodyweight and Cardio by
+*kind* of exercise rather than by unit of measurement, so a plank sits with the calisthenics
+instead of beside the rowing machine.
 
-**Days** is the calendar, and it encodes **kind and presence rather than magnitude** — how much
-you lifted is answered better on Week and Food, while what only a calendar can answer is what
-kind of day this was and when you last did it. Each square carries two fixed-order rows of
+Each row draws a sparkline of its own last ten sessions, never scaled against other exercises:
+a bar comparing a curl to a leg press only restates which movements use big muscles. Tapping
+one opens its full history — estimated 1RM per session, the sets of each, volume per session.
+Nothing else in the app can distinguish a lift that added 40lb last month from one stalled
+since June.
+
+**History** is the calendar, and it encodes **kind and presence rather than magnitude** — how
+much you lifted is answered better on Today and Food, while what only a calendar can answer is
+what kind of day this was and when you last did it. Each square carries two fixed-order rows of
 slots: movement patterns on top (push · pull · legs · core · cardio) and the three anchor meals
 below. Position is the encoding, so the palette stays one colour and a leg day has a different
 silhouette from a pull day.

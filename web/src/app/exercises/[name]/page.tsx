@@ -74,7 +74,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ name:
 function BackLink() {
   return (
     <Link
-      href="/lifts"
+      href="/exercises"
       className="cap pressable"
       style={{
         color: 'var(--signal)',
@@ -85,7 +85,7 @@ function BackLink() {
         borderBottom: '1px solid var(--rule)',
       }}
     >
-      ‹ All lifts
+      ‹ All exercises
     </Link>
   );
 }

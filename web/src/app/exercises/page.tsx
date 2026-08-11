@@ -14,12 +14,12 @@ export const dynamic = 'force-dynamic';
  * time", and an all-time list sorted by weight buries the thing you are about to repeat under
  * a deadlift you last did in March.
  */
-export default async function Lifts() {
+export default async function Exercises() {
   const result = await getPrs(60);
 
   return (
     <main className="screen">
-      <Masthead left="Lifts" right="Best set" />
+      <Masthead left="Exercises" right="Best set" />
       <Body result={result} />
     </main>
   );
@@ -90,7 +90,7 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
 
 function Weighted({ row }: { row: PrRow }) {
   return (
-    <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
+    <Link href={`/exercises/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
       <WeightedBody row={row} />
     </Link>
   );
@@ -141,7 +141,7 @@ function WeightedBody({ row }: { row: PrRow }) {
 
 function Endurance({ row }: { row: PrRow }) {
   return (
-    <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
+    <Link href={`/exercises/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
       <EnduranceBody row={row} />
     </Link>
   );
@@ -218,7 +218,7 @@ function EnduranceBody({ row }: { row: PrRow }) {
 function Calisthenic(props: { row: PrRow }) {
   return (
     <Link
-      href={`/lifts/${encodeURIComponent(props.row.exercise)}`}
+      href={`/exercises/${encodeURIComponent(props.row.exercise)}`}
       className="pressable"
       style={{ display: 'block' }}
     >

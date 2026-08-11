@@ -11,11 +11,11 @@ import { usePathname, useRouter } from 'next/navigation';
  */
 const TABS = [
   { href: '/', label: 'Today' },
-  // Four tabs, one question each: now / over time / lifts / food. "Week" used to sit between
+  // Four tabs, one question each: now / over time / exercises / food. "Week" used to sit between
   // the first two and answered the same question as this one at a different zoom, so its
   // eight-week ledger moved onto this screen and the tab went away.
   { href: '/calendar', label: 'History' },
-  { href: '/lifts', label: 'Lifts' },
+  { href: '/exercises', label: 'Exercises' },
   { href: '/food', label: 'Food' },
 ] as const;
 
