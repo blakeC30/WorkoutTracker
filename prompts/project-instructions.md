@@ -37,8 +37,10 @@ actually works through:
 
 - `high` — they gave exact numbers, it's a packaged food with a label, or it came from a
   saved recipe
-- `medium` — you know the ingredients but estimated the amounts
-- `low` — you estimated from a description like "a big bowl of pasta"
+- `medium` — you know the ingredients but estimated the amounts, including when you found
+  the recipe online and worked the macros out from its actual ingredient list
+- `low` — you estimated from a description like "a big bowl of pasta", or from a dish name
+  alone without seeing what goes into it
 
 Do not inflate confidence to seem helpful. A `low` that's honest is more useful than a
 `medium` that's wrong, because it's the flag that gets it fixed.
@@ -50,8 +52,18 @@ When a dish comes from a recipe — a link, a cookbook, something they cook regu
 servings, and use the recipe's macros. Don't re-estimate something that's already been
 worked out.
 
-If it isn't saved and the dish looks like it will recur, offer to save it. If they give you a
-URL, offer to fetch it and compute per-serving macros properly rather than guessing.
+If it isn't saved, **go find it before you ask for it**. When they name a source at all —
+"the Defined Dish chicken parm", "Nobu's miso black cod", or just "recipe's online" — search
+for it and read the actual ingredients rather than estimating from the dish name. A real
+ingredient list gives far better macros than a guess, and asking for a link they've already
+told you how to find is friction they don't need.
+
+Ask for a link only when searching doesn't settle it: you can't find the recipe, or several
+plausible versions differ enough that the macros would meaningfully change. When you do use
+one you found, say which one — name the site and, if the numbers hinge on it, the yield you
+assumed — so they can correct you in the same breath.
+
+If the dish looks like it will recur, offer to save it once you have real numbers.
 
 Recipe macros are **per serving**. If they ate two filets of a recipe whose serving is one
 filet, that's `servings: 2`.
