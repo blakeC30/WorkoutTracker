@@ -40,7 +40,8 @@ toggle** — one user, one lighting context, one decision.
 
 ## Colour
 
-Three hues, 60 / 30 / 10.
+Three hues carry the interface, 60 / 30 / 10 — plus one small categorical palette for movement
+patterns, described below.
 
 | Token | Value | Role |
 | --- | --- | --- |
@@ -53,7 +54,34 @@ Three hues, 60 / 30 / 10.
 | `--signal` | `#E0913A` | 10% — sodium amber. The single accent. Current value, active tab, primary series |
 | `--signal-low` | `#7A5124` | Amber at rest — bar troughs, inactive fills |
 
-Semantic colours are kept separate from the accent, so "good" never has to borrow the brand:
+### The categorical palette
+
+One dimension in this app is coloured by category — **movement pattern** — and nothing else is.
+
+| Token | Value | Pattern |
+| --- | --- | --- |
+| `--push` | `#e07a62` | Push |
+| `--pull` | `#4e9ec4` | Pull |
+| `--legs` | `#8f84d0` | Legs |
+| `--core` | `#c97ba3` | Core |
+| `--cardio` | `#5fa87b` | Cardio |
+
+These are defined once in `src/lib/patterns.ts` and imported by every screen, so a colour cannot
+mean push on the calendar and pull on the lifts list. Rules that keep it from becoming the
+rainbow dashboard it could easily be:
+
+- **It encodes exactly one thing.** Muscle regions, meal types, macros and weeks all stay
+  monochrome. If a second dimension gets colours, the first one stops meaning anything.
+- **Colour is redundant, never load-bearing.** Slot position is fixed and a text label is always
+  present, so the palette reinforces a reading you could already get without it. That is also
+  what makes it safe for colour-vision deficiency — and why push and cardio, the red/green pair,
+  differ in lightness as well as hue.
+- **None of them is the signal amber.** Chrome — active tab, focus ring, today's outline, the
+  current value — stays `--signal`, so interface colour and data colour never compete.
+- Hues sit ~65° apart and are pulled toward the warm ground, so they read as one set rather than
+  five saturated defaults.
+
+Semantic colours are kept separate from both, so "good" never has to borrow the brand:
 
 | Token | Value | Role |
 | --- | --- | --- |

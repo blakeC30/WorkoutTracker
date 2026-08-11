@@ -33,7 +33,7 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
 
   return sql`
     with matched as (
-      select e.id as exercise_id, e.name as exercise, e.category,
+      select e.id as exercise_id, e.name as exercise, e.category, e.pattern,
              w.entry_date, s.reps, s.weight_lbs, s.distance_mi, s.duration_min
       from workout_sets s
       join workouts w  on w.id = s.workout_id
@@ -68,7 +68,7 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
       where distance_mi is not null or duration_min is not null
       group by exercise_id
     )
-    select m.exercise, m.category,
+    select m.exercise, m.category, m.pattern,
            case when h.exercise_id is not null then 'weighted' else 'endurance' end as record_type,
            h.weight_lbs        as heaviest_lbs,
            h.reps              as heaviest_reps,
@@ -86,7 +86,7 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
     left join heaviest  h  on h.exercise_id  = m.exercise_id
     left join best_e1rm b  on b.exercise_id  = m.exercise_id
     left join endurance en on en.exercise_id = m.exercise_id
-    group by m.exercise, m.category, h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
+    group by m.exercise, m.category, m.pattern, h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
              b.e1rm, b.weight_lbs, b.reps, b.entry_date,
              en.best_distance_mi, en.best_duration_min, en.best_pace_min_per_mi
     order by max(m.entry_date) desc

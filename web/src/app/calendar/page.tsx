@@ -3,27 +3,12 @@ import type { CSSProperties } from 'react';
 import { getCalendar, getRecency, n, n0, type CalendarRow, type RecencyRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
+import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
 import { compact, dec, int, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-/**
- * The five movement patterns, in a FIXED order that never changes.
- *
- * That fixity is the whole encoding. Each slot in a calendar square always means the same
- * thing, so a leg day and a pull day have different silhouettes and you learn to read them
- * without a legend. Sorting these by frequency, or omitting patterns a day didn't train, would
- * destroy the only property that makes a 6px mark legible.
- */
-const PATTERNS = [
-  { key: 'push', label: 'Push' },
-  { key: 'pull', label: 'Pull' },
-  { key: 'legs', label: 'Legs' },
-  { key: 'core', label: 'Core' },
-  { key: 'cardio', label: 'Cardio' },
-] as const;
 
 /**
  * Only the three anchor meals get a slot.
@@ -33,9 +18,9 @@ const PATTERNS = [
  * row exists to surface.
  */
 const MEALS = [
-  { key: 'breakfast', label: 'B' },
-  { key: 'lunch', label: 'L' },
-  { key: 'dinner', label: 'D' },
+  { key: 'breakfast', long: 'Breakfast' },
+  { key: 'lunch', long: 'Lunch' },
+  { key: 'dinner', long: 'Dinner' },
 ] as const;
 
 export default async function Calendar({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
@@ -167,9 +152,14 @@ function Grid({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }
       {/* The legend draws the same marks the squares do rather than describing them in words.
           Naming the rows in prose ran to two wrapped lines and still left you mapping "top row"
           onto a 4px tick; showing a lit slot next to its label does not. */}
+      {/* Each legend label is tinted to match its own slot, so the mapping from colour to
+          meaning is stated once, in the order the slots appear. */}
       <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <LegendRow items={PATTERNS.map((p) => p.label)} tone="var(--signal)" height={4} />
-        <LegendRow items={['Breakfast', 'Lunch', 'Dinner']} tone="var(--signal-low)" height={3} />
+        <LegendRow items={PATTERNS.map((p) => ({ label: p.label, tone: p.color }))} height={4} />
+        <LegendRow
+          items={MEALS.map((m) => ({ label: m.long, tone: 'var(--ink-faint)' }))}
+          height={3}
+        />
       </div>
     </div>
   );
@@ -222,15 +212,16 @@ function Square({
       {hasAnything ? (
         <span style={{ display: 'block' }}>
           <Slots
-            items={PATTERNS.map((p) => patterns.has(p.key))}
-            tone="var(--signal)"
+            items={PATTERNS.map((p) => ({ on: patterns.has(p.key), tone: p.color }))}
             height={4}
             delay={day * 8}
           />
           <span style={{ display: 'block', height: 2 }} />
+          {/* Meals stay monochrome. Colour in this app means one thing — which movement
+              pattern — and giving the meal row its own hues would imply the two rows are the
+              same kind of category when they are not even the same dimension. */}
           <Slots
-            items={MEALS.map((m) => meals.has(m.key))}
-            tone="var(--signal-low)"
+            items={MEALS.map((m) => ({ on: meals.has(m.key), tone: 'var(--ink-faint)' }))}
             height={3}
             delay={day * 8 + 40}
           />
@@ -248,18 +239,26 @@ function Square({
   );
 }
 
-/** One legend line: a lit slot, then what that position means, in the slots' own order. */
-function LegendRow({ items, tone, height }: { items: readonly string[]; tone: string; height: number }) {
+/** One legend line: the lit slots, then what each position means, in the slots' own order. */
+function LegendRow({
+  items,
+  height,
+}: {
+  items: readonly { label: string; tone: string }[];
+  height: number;
+}) {
   return (
-    <div className="cap" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-faint)' }}>
+    <div className="cap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ display: 'flex', gap: 2, width: 34, flexShrink: 0 }}>
-        {items.map((_, i) => (
-          <span key={i} style={{ flex: 1, height, background: tone }} />
+        {items.map((item) => (
+          <span key={item.label} style={{ flex: 1, height, background: item.tone }} />
         ))}
       </span>
       <span style={{ display: 'flex', gap: 8, minWidth: 0 }}>
-        {items.map((label) => (
-          <span key={label}>{label}</span>
+        {items.map((item) => (
+          <span key={item.label} style={{ color: item.tone }}>
+            {item.label}
+          </span>
         ))}
       </span>
     </div>
@@ -269,26 +268,24 @@ function LegendRow({ items, tone, height }: { items: readonly string[]; tone: st
 /** A fixed row of on/off marks. Unfilled slots keep a faint track so position stays readable. */
 function Slots({
   items,
-  tone,
   height,
   delay,
 }: {
-  items: boolean[];
-  tone: string;
+  items: { on: boolean; tone: string }[];
   height: number;
   delay: number;
 }) {
   return (
     <span style={{ display: 'flex', gap: 2 }}>
-      {items.map((on, i) => (
+      {items.map((item, i) => (
         <span
           key={i}
-          className={on ? 'draw-x' : undefined}
+          className={item.on ? 'draw-x' : undefined}
           style={
             {
               flex: 1,
               height,
-              background: on ? tone : 'var(--rule)',
+              background: item.on ? item.tone : 'var(--rule)',
               '--delay': `${delay + i * 25}ms`,
             } as CSSProperties
           }
@@ -324,7 +321,7 @@ function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
               key={pattern.key}
               style={{ display: 'grid', gridTemplateColumns: '54px 1fr 26px', alignItems: 'center', gap: 8, height: 20 }}
             >
-              <span className="cap" style={{ color: hits ? 'var(--ink-dim)' : 'var(--ink-faint)' }}>
+              <span className="cap" style={{ color: hits ? pattern.color : 'var(--ink-faint)' }}>
                 {pattern.label}
               </span>
               <span style={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -341,7 +338,7 @@ function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
                           // A trained day is a solid block; an untrained one is a hairline on the
                           // baseline. Same footprint, so the columns stay aligned with the dates.
                           height: on ? 12 : 1,
-                          background: on ? 'var(--signal)' : 'var(--rule)',
+                          background: on ? pattern.color : 'var(--rule)',
                           opacity: future ? 0.3 : 1,
                           '--delay': `${rowIndex * 60 + i * 6}ms`,
                         } as CSSProperties
@@ -413,18 +410,25 @@ function Recency({ result }: { result: Awaited<ReturnType<typeof getRecency>> })
 
 function Gap({ row }: { row: RecencyRow }) {
   const days = row.days_since;
-  const label = PATTERNS.find((p) => p.key === row.pattern)?.label ?? row.pattern;
+  const label = patternLabel(row.pattern);
 
-  // A week is the threshold, not a judgement about programming: it is simply the point past
-  // which "when did I last do this" stops being obvious without looking it up.
-  const tone = days === null ? 'var(--flag)' : days >= 7 ? 'var(--flag)' : 'var(--ink)';
+  // The pattern's colour identifies WHICH, and a rule under the label carries it — but the
+  // number itself stays plain ink so a long gap is not mistaken for a different category.
+  // Overdue is signalled by the flag colour on the number alone.
+  const overdue = days === null || days >= 7;
 
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div className="cap" style={{ color: 'var(--ink-faint)' }}>
+      <div
+        className="cap"
+        style={{ color: 'var(--ink-faint)', borderBottom: `2px solid ${patternColor(row.pattern)}`, paddingBottom: 3 }}
+      >
         {label}
       </div>
-      <div className="mono" style={{ fontSize: 'var(--t-lg)', marginTop: 2, color: tone }}>
+      <div
+        className="mono"
+        style={{ fontSize: 'var(--t-lg)', marginTop: 5, color: overdue ? 'var(--flag)' : 'var(--ink)' }}
+      >
         {days === null ? '—' : days === 0 ? 'today' : days}
         {days !== null && days > 0 ? (
           <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)' }}>d</span>

@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { getPrs, n, type PrRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
+import { patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, clock, daysAgo, dec, int, shortDay } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,9 @@ function Weighted({ row, max, index }: { row: PrRow; max: number; index: number 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <span className="selectable" style={{ fontSize: 'var(--t-base)', lineHeight: 1.2 }}>
           {row.exercise}
+          <span className="cap" style={{ color: patternColor(row.pattern), marginLeft: 8 }}>
+            {patternLabel(row.pattern)}
+          </span>
         </span>
         <span className="mono" style={{ fontSize: 'var(--t-xl)', fontWeight: 500, lineHeight: 1 }}>
           {int(e1rm)}
@@ -89,11 +93,18 @@ function Weighted({ row, max, index }: { row: PrRow; max: number; index: number 
         </span>
       </div>
 
+      {/* Tinted by the same palette the calendar uses, so scanning this list groups your
+          pressing and pulling work without any sorting or headers. */}
       <div style={{ height: 3, background: 'var(--rule)', margin: '9px 0 8px' }}>
         <div
           className="draw-x"
           style={
-            { width: `${pct}%`, height: '100%', background: 'var(--signal)', '--delay': `${index * 45}ms` } as CSSProperties
+            {
+              width: `${pct}%`,
+              height: '100%',
+              background: patternColor(row.pattern),
+              '--delay': `${index * 45}ms`,
+            } as CSSProperties
           }
         />
       </div>

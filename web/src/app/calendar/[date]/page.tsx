@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getDay, n, n0, type DayDetail, type DayJournal, type DayMeal, type DayWorkout } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
+import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
 import { addDays, agoLabel, clock, dayLabel, dec, int, monthKey, monthShape, shortDay, today } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -140,8 +141,26 @@ function Training({ workouts }: { workouts: DayWorkout[] }) {
   );
   const sets = workouts.reduce((sum, w) => sum + w.sets.length, 0);
 
+  // What kind of day this was, in the calendar's own order and colours — so the answer matches
+  // the square you tapped to get here instead of being re-derived in a different vocabulary.
+  const trained = PATTERNS.filter((pattern) =>
+    workouts.some((workout) => workout.pattern === pattern.key),
+  );
+
   return (
     <Section label="Training" aside={`${workouts.length} exercises · ${sets} sets`}>
+      {trained.length > 0 ? (
+        <div className="cap" style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          {trained.map((pattern) => (
+            <span
+              key={pattern.key}
+              style={{ color: pattern.color, borderBottom: `2px solid ${pattern.color}`, paddingBottom: 3 }}
+            >
+              {pattern.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {volume > 0 ? <Figure value={int(volume)} unit="LB VOLUME" count={volume} /> : null}
       <div style={{ marginTop: volume > 0 ? 20 : 0 }}>
         {workouts.map((workout) => (
@@ -185,6 +204,9 @@ function Exercise({ workout }: { workout: DayWorkout }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <span className="selectable" style={{ lineHeight: 1.25 }}>
           {workout.exercise}
+          <span className="cap" style={{ color: patternColor(workout.pattern), marginLeft: 8 }}>
+            {patternLabel(workout.pattern)}
+          </span>
         </span>
         <span className="mono" style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-faint)', flexShrink: 0 }}>
           {summary}

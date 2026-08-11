@@ -20,6 +20,27 @@
   --down: #c4553d;
   --flag: #c9a227;
 
+  /* Movement patterns — the app's one categorical palette.
+   *
+   * Rules that keep this from becoming a rainbow:
+   *   - It encodes exactly ONE dimension. Nothing else in the app is coloured by category.
+   *   - It is redundant, never load-bearing: slot position and a text label always say the
+   *     same thing, so the palette is reinforcement rather than the only channel. That is
+   *     also what makes it safe for colour-vision deficiency.
+   *   - None of these is the signal amber. Chrome (active tab, focus ring, today's outline)
+   *     stays amber so interface colour and data colour never compete for the same meaning.
+   *
+   * Hues are spaced ~65 degrees apart and pulled toward the warm charcoal ground so they read
+   * as one considered set rather than five saturated defaults. Push and cardio are deliberately
+   * offset in lightness as well as hue, since red and green are the pair red-green colour
+   * blindness confuses.
+   */
+  --push: #e07a62;
+  --pull: #4e9ec4;
+  --legs: #8f84d0;
+  --core: #c97ba3;
+  --cardio: #5fa87b;
+
   --gutter: 20px;
   --tabbar: 52px;
 

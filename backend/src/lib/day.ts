@@ -147,7 +147,7 @@ export async function getDay(date: string) {
        from bodyweight b where b.entry_date = ${date}::date) as bodyweight,
 
       (select coalesce(json_agg(x order by x.exercise), '[]'::json) from (
-         select e.name as exercise, e.category, e.equipment, w.notes,
+         select e.name as exercise, e.category, e.pattern, e.equipment, w.notes,
                 coalesce((
                   select json_agg(json_build_object(
                            'set_number',   s.set_number,

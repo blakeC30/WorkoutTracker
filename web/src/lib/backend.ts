@@ -136,6 +136,7 @@ export type WeekRow = {
 export type PrRow = {
   exercise: string;
   category: string | null;
+  pattern: string | null;
   record_type: 'weighted' | 'endurance';
   heaviest_lbs: Num;
   heaviest_reps: number | null;
@@ -205,6 +206,7 @@ export type DaySet = {
 export type DayWorkout = {
   exercise: string;
   category: string | null;
+  pattern: string | null;
   equipment: string | null;
   notes: string | null;
   sets: DaySet[];
