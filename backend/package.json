@@ -9,7 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "migrate": "node --env-file=.env.local scripts/migrate.mjs"
+    "migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "seed": "node --env-file=.env.local scripts/seed.mjs",
+    "seed:clear": "node --env-file=.env.local scripts/seed-clear.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
