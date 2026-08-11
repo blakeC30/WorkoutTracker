@@ -50,8 +50,20 @@ can't see. When `meal_type` was added, an already-connected client kept writing 
 into the description text instead, and every `meal_type` came back null — which looks exactly
 like a prompt that isn't landing.
 
-After any change to a tool's `inputSchema`, toggle the connector off and on in Claude's
-settings (or remove and re-add it). To confirm what a deployment is actually serving:
+After any change to a tool's `inputSchema`, **remove the connector and add it again**.
+Toggling it off and on is not enough — that has been observed to keep the cached tool list.
+A connector left connected across several schema changes was still serving the original
+six-field meal schema weeks later.
+
+A partial symptom is the confusing one: fields named in the project instructions still get
+populated, because the model sends them as plain strings even when its cached schema omits
+them, and the server accepts them. Nested objects (like `recipe`) never appear, because
+inventing a whole object that isn't in the schema is a much bigger leap. So you can see
+`meal_type` filling in correctly while `recipe` is silently ignored — which looks like a
+prompt problem and isn't.
+
+To check what the model actually sees, ask it directly in the conversation: *"List every
+field the log_entry tool accepts inside a meals entry."* Compare that to `tools/list` below. To confirm what a deployment is actually serving:
 
 ```bash
 SECRET=$(grep '^API_SECRET=' backend/.env.local | cut -d= -f2-)

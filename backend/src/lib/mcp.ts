@@ -172,7 +172,7 @@ export const mcpHandler = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: 'workout-tracker', version: '0.2.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.3.0' },
     instructions:
       'Personal fitness tracker for a single user. When they describe training, food or ' +
       'bodyweight, parse it and call log_entry with both the raw text and the structured ' +
