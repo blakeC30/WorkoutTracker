@@ -361,6 +361,22 @@ function Dish({ meal }: { meal: DayMeal }) {
           {int(t.calories)}
         </span>
       </div>
+      {/* Macros per dish, on their own line under the name — the same shape the exercise rows
+          use, where a name line is followed by its detail. The numbers were already computed
+          for the day total above; reporting only calories here made this the one place on a
+          page dedicated to showing a day as recorded that summarised instead.
+          Already multiplied by servings, so these are what the dish actually contributed. */}
+      {meal.calories !== null ? (
+        <div
+          className="mono"
+          style={{ display: 'flex', gap: 10, marginTop: 3, fontSize: 'var(--t-cap)', color: 'var(--ink-faint)' }}
+        >
+          <span>{int(t.protein)} P</span>
+          <span>{int(t.carbs)} C</span>
+          <span>{int(t.fat)} F</span>
+        </div>
+      ) : null}
+
       {meal.note ? (
         <p style={{ margin: '3px 0 0', color: 'var(--ink-faint)', fontSize: 'var(--t-cap)' }}>{meal.note}</p>
       ) : null}
