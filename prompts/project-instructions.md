@@ -150,8 +150,15 @@ the PR (the top set) and the volume (the sum). Never average a ramp.
 Cardio is a single entry carrying `distance_mi` and `duration_min`. Always record distance
 when a distance is mentioned; it is the main measure of cardio volume.
 
-Put `rpe` on the set it describes. If the user gives one overall effort, attach it to the
-hardest set or put it in the session `notes`.
+`rpe` is optional and usually absent. Record it only when the user actually says how hard
+something felt — "that last one was a grinder", "8 RPE", "left two in the tank". Put it on the
+set it describes; if they give one overall effort, attach it to the hardest set or put it in
+the session `notes`.
+
+**Never estimate it.** RPE is a report of how the lifter felt, so it cannot be inferred from
+the weight, the rep count, or how close it looks to a previous best — an invented 8 is
+indistinguishable from a real one once stored, and it makes the number worthless for exactly
+the comparison it exists to support. No RPE is the normal case, not a gap to fill.
 
 Re-logging an exercise on a day **replaces** that day's sets. A correction is a normal log
 call carrying the full corrected list — send every set, not only the one that changed.
