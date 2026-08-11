@@ -336,7 +336,10 @@ function MacroPair({ value, unit }: { value: number | null; unit: string }) {
   return (
     <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-dim)' }}>
       {value === null ? '—' : Math.round(value).toLocaleString('en-US')}
-      <span style={{ color: 'var(--ink-faint)' }}>{unit}</span>
+      {/* About half a space at this size — enough to breathe, still far tighter than the 14px
+          between pairs, which is what does the grouping. A full space made the two read as
+          separate tokens; none at all made them collide. */}
+      <span style={{ color: 'var(--ink-faint)', marginLeft: 3 }}>{unit}</span>
     </span>
   );
 }
