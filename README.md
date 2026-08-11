@@ -39,6 +39,31 @@ cd ../web && npm install && cp .env.example .env.local
 | `npm run dev`     | Local dev server on :3000                                  |
 | `npm run migrate` | Applies any unapplied `.sql` file in `migrations/`. Safe to re-run. |
 
+## Changing an MCP tool schema — reconnect the connector
+
+**MCP clients fetch tool definitions once, when the connection is established.** Deploying a
+change to a tool's input schema does not reach a connector that is already connected — it
+keeps using the definitions it fetched originally, however many times you redeploy.
+
+The failure is quiet and easy to misread. Claude doesn't error; it works around the field it
+can't see. When `meal_type` was added, an already-connected client kept writing "Breakfast:"
+into the description text instead, and every `meal_type` came back null — which looks exactly
+like a prompt that isn't landing.
+
+After any change to a tool's `inputSchema`, toggle the connector off and on in Claude's
+settings (or remove and re-add it). To confirm what a deployment is actually serving:
+
+```bash
+SECRET=$(grep '^API_SECRET=' backend/.env.local | cut -d= -f2-)
+curl -s -X POST "https://<your-backend>.vercel.app/api/mcp/$SECRET" \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+If the field is in that response but missing from what Claude sends, it's the cache — not the
+prompt, and not the code.
+
 ## Database
 
 Neon Postgres 18, region `aws-us-east-1` (matches Vercel's default `iad1` function region).
