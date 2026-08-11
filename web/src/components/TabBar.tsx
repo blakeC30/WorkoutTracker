@@ -11,10 +11,10 @@ import { usePathname, useRouter } from 'next/navigation';
  */
 const TABS = [
   { href: '/', label: 'Today' },
-  { href: '/week', label: 'Week' },
-  // "Days" rather than "Calendar": at 11px with the tracking these labels carry, the longer
-  // word leaves 6px of breathing room in a 78px tab. The screen itself is headed by its month.
-  { href: '/calendar', label: 'Days' },
+  // Four tabs, one question each: now / over time / lifts / food. "Week" used to sit between
+  // the first two and answered the same question as this one at a different zoom, so its
+  // eight-week ledger moved onto this screen and the tab went away.
+  { href: '/calendar', label: 'History' },
   { href: '/lifts', label: 'Lifts' },
   { href: '/food', label: 'Food' },
 ] as const;

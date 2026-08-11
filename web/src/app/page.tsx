@@ -1,6 +1,7 @@
-import { getBodyweight, getMuscles, getNutrition, getReview, n, n0 } from '@/lib/backend';
+import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type PatternVolumeRow, type RecencyRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Row, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
+import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
 import Link from 'next/link';
 
@@ -15,11 +16,12 @@ export const dynamic = 'force-dynamic';
  */
 export default async function Today() {
   // Fetched together rather than in sequence; four round trips to Vercel add up on cellular.
-  const [weight, muscles, nutrition, review] = await Promise.all([
+  const [weight, patterns, nutrition, review, recency] = await Promise.all([
     getBodyweight(90),
-    getMuscles(28),
+    getVolumeByPattern(28),
     getNutrition(7),
     getReview(25),
+    getRecency(),
   ]);
 
   const now = new Date();
@@ -31,20 +33,26 @@ export default async function Today() {
       {/* Sections are raised into place as they come into view, each a beat after the last.
           The delays are small on purpose — this is a screen you check for five seconds, so the
           whole page has to be settled before you have finished looking at the first number. */}
+      {/* First thing on the screen, because it is the only thing here that tells you what to
+          DO. It was previously three scrolls down a tab you had to open on purpose. */}
       <Reveal>
-        <Bodyweight result={weight} />
+        <Ready result={recency} />
       </Reveal>
       <Rule />
       <Reveal delay={60}>
-        <Fuel result={nutrition} />
+        <Bodyweight result={weight} />
       </Reveal>
       <Rule />
       <Reveal delay={120}>
-        <Volume result={muscles} />
+        <Fuel result={nutrition} />
+      </Reveal>
+      <Rule />
+      <Reveal delay={180}>
+        <Volume result={patterns} />
       </Reveal>
 
       {review.ok && review.rows.length > 0 ? (
-        <Reveal delay={180}>
+        <Reveal delay={240}>
           <Rule />
           <Link href="/food" className="pressable" style={{ display: 'block' }}>
             <Row
@@ -184,7 +192,83 @@ function Macro({ label, grams, tone }: { label: string; grams: number; tone: str
   );
 }
 
-function Volume({ result }: { result: Awaited<ReturnType<typeof getMuscles>> }) {
+/**
+ * What you have and have not trained lately, in the calendar's colours and order.
+ *
+ * This replaced a volume-by-muscle-region chart. Two reasons: the app already reports volume on
+ * three other screens, and that chart spoke a taxonomy (`arms`, `back`) no other screen uses —
+ * so the one place you looked first disagreed with everywhere you went next.
+ */
+function Ready({ result }: { result: Awaited<ReturnType<typeof getRecency>> }) {
+  if (!result.ok) {
+    return (
+      <Section label="Last trained">
+        <Fault error={result.error} />
+      </Section>
+    );
+  }
+  if (result.rows.length === 0) {
+    return (
+      <Section label="Last trained">
+        <Empty>No sessions recorded yet.</Empty>
+      </Section>
+    );
+  }
+
+  // Ordered longest-gap-first by the query, so the thing most worth doing is leftmost.
+  const overdue = result.rows.filter((r) => r.days_since === null || r.days_since >= 7);
+
+  return (
+    <Section
+      label="Last trained"
+      aside={overdue.length > 0 ? `${overdue.length} over a week` : 'all within a week'}
+    >
+      <div style={{ display: 'flex', gap: 10 }}>
+        {result.rows.map((row) => (
+          <Gap key={row.pattern} row={row} />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Gap({ row }: { row: RecencyRow }) {
+  const days = row.days_since;
+  const overdue = days === null || days >= 7;
+
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        className="cap"
+        style={{
+          color: 'var(--ink-faint)',
+          borderBottom: `2px solid ${patternColor(row.pattern)}`,
+          paddingBottom: 3,
+        }}
+      >
+        {patternLabel(row.pattern)}
+      </div>
+      <div
+        className="mono"
+        style={{ fontSize: 'var(--t-lg)', marginTop: 5, color: overdue ? 'var(--flag)' : 'var(--ink)' }}
+      >
+        {days === null ? '—' : days === 0 ? 'today' : days}
+        {days !== null && days > 0 ? (
+          <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)' }}>d</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Four weeks of work, by movement pattern.
+ *
+ * Cardio is reported separately rather than as a sixth bar: it has no tonnage, so a bar scaled
+ * against loaded volume would always read zero and imply you had not done it. Miles and minutes
+ * are its real measures.
+ */
+function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPattern>> }) {
   if (!result.ok) {
     return (
       <Section label="Volume" aside="28d">
@@ -193,41 +277,60 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getMuscles>> }) 
     );
   }
 
-  const rows = result.rows.filter((r) => n0(r.primary_volume_lbs) > 0 || n0(r.secondary_volume_lbs) > 0);
-  if (rows.length === 0) {
+  const byPattern = new Map(result.rows.map((r) => [r.pattern, r]));
+  const trained = PATTERNS.map((p) => ({ pattern: p, row: byPattern.get(p.key) })).filter(
+    (entry) => entry.row !== undefined,
+  );
+
+  // Split, not filtered. A bar needs tonnage to have a length, and planks and cardio have none —
+  // so a bar chart drops them silently and the screen reads "you have not trained core in four
+  // weeks", which is a very different claim from "core was timed rather than loaded".
+  const loaded = trained.filter((entry) => n0(entry.row?.volume_lbs) > 0);
+  const timed = trained.filter((entry) => n0(entry.row?.volume_lbs) === 0);
+
+  if (trained.length === 0) {
     return (
       <Section label="Volume" aside="28d">
-        <Empty>No loaded sets in the last four weeks. Cardio-only sessions don&apos;t produce volume.</Empty>
+        <Empty>Nothing logged in the last four weeks.</Empty>
       </Section>
     );
   }
 
-  const max = Math.max(...rows.map((r) => n0(r.primary_volume_lbs)));
-  const total = rows.reduce((sum, r) => sum + n0(r.primary_volume_lbs), 0);
+  const max = Math.max(...loaded.map((entry) => n0(entry.row?.volume_lbs)), 1);
+  const total = loaded.reduce((sum, entry) => sum + n0(entry.row?.volume_lbs), 0);
 
   return (
     <Section label="Volume" aside="28d">
-      {rows.map((row, i) => (
+      {loaded.map((entry, i) => (
         <BarRow
-          key={row.region}
+          key={entry.pattern.key}
           index={i}
-          label={row.region}
-          value={n0(row.primary_volume_lbs)}
-          secondary={n0(row.secondary_volume_lbs)}
+          label={entry.pattern.label}
+          value={n0(entry.row?.volume_lbs)}
           max={max}
-          display={compact(n0(row.primary_volume_lbs))}
+          tone={entry.pattern.color}
+          display={compact(n0(entry.row?.volume_lbs))}
         />
       ))}
-      <div className="cap" style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ color: 'var(--ink-faint)' }}>
-          <Swatch tone="var(--signal)" />
-          primary
-          <span style={{ marginLeft: 12 }}>
-            <Swatch tone="var(--signal-low)" />
-            secondary
-          </span>
-        </span>
-        <span>{int(total)} lb</span>
+
+      {timed.length > 0 ? (
+        <div
+          className="cap"
+          style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 14, color: 'var(--ink-faint)' }}
+        >
+          {timed.map((entry) => (
+            <span key={entry.pattern.key}>
+              <Swatch tone={entry.pattern.color} />
+              {entry.pattern.label}{' '}
+              {n0(entry.row?.distance_mi) > 0 ? `${dec(n(entry.row?.distance_mi), 1)} mi · ` : ''}
+              {int(n(entry.row?.duration_min))} min
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="cap" style={{ marginTop: 10, textAlign: 'right', color: 'var(--ink-faint)' }}>
+        {int(total)} lb loaded
       </div>
     </Section>
   );

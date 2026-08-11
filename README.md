@@ -41,9 +41,21 @@ cd ../web && npm install && cp .env.example .env.local
 
 ## The dashboard
 
-Five screens — **Today**, **Week**, **Days**, **Lifts**, **Food** — built for one device: an
-iPhone 13 Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on
-purpose.
+Four screens — **Today**, **History**, **Lifts**, **Food** — built for one device: an iPhone 13
+Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on purpose.
+
+One question per tab: *now / over time / lifts / food*. There used to be a fifth, Week, whose
+eight-week ledger answered the same question as the month grid at a different zoom; it now sits
+below that grid on History instead.
+
+**Today** opens with how long since each movement pattern was last trained, because that is the
+only thing on the screen that says what to *do*. Volume below it is grouped by pattern, and
+patterns with no tonnage — cardio, planks — are reported in minutes and miles rather than
+dropped, since a bar chart silently omitting core reads as "you have not trained it".
+
+**Lifts** → tapping any exercise opens its full history: estimated 1RM over every session, the
+sets of each one, and volume per session. Nothing else in the app can distinguish a lift that
+added 40lb last month from one stalled since June.
 
 **Days** is the calendar, and it encodes **kind and presence rather than magnitude** — how much
 you lifted is answered better on Week and Food, while what only a calendar can answer is what
@@ -83,6 +95,21 @@ How the secret stays server-side: each screen is a Server Component that calls
 Component is a **build error**, not a code-review catch. Data reaches the two interactive
 components as plain props. Verify with `grep -r "$API_SECRET" web/.next/static` after a
 build; it should return nothing.
+
+### The one write
+
+The dashboard is otherwise read-only, but the review queue can correct a food's macros in
+place — the capability the schema was built for (`journal_id` is nullable *because* rows
+corrected by hand in the dashboard have no journal origin).
+
+It goes through a Server Action, not a route handler: the action runs on the server so it can
+reach the module holding the secret, and `web/` never grows a public POST endpoint of its own.
+The backend side is `POST /api/foods`, wrapped in `writeEndpoint` rather than `readEndpoint` —
+kept as a separate wrapper on purpose, since a read that leaks is a disclosure but a write that
+gets through is corruption of the log.
+
+An empty field means "leave this alone", not zero. Saving marks the food `high` confidence and
+moves **every meal ever logged with it**, including past days — the UI says so above the button.
 
 Before changing anything visual, read **`web/DESIGN.md`**. It fixes the palette, the two
 typefaces, the spacing scale, and a list of things this codebase deliberately does not do

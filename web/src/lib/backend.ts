@@ -66,27 +66,14 @@ async function queryOne<T>(path: string, params: Record<string, string | number>
   return row ? { ok: true, row } : { ok: false, error: 'Empty response' };
 }
 
-/**
- * Postgres `numeric` arrives over the wire as a STRING — `sum()`, `avg()` and `round()` all
- * return numeric, so `volume_lbs` is "83265" and not 83265. Columns cast `::int` come back as
- * real numbers. Rather than remember which is which at every call site, every numeric field is
- * typed `Num` and read through `n()`.
- */
-// `undefined` is included because a calendar square looks up a day that may not be in the
-// response at all — an absent day and a null column both mean "no reading", and forcing the
-// call site to distinguish them would only produce `?? null` noise.
-export type Num = string | number | null | undefined;
-
-export function n(value: Num): number | null {
-  if (value === null || value === undefined) return null;
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-/** Same, for the many places where "no rows yet" should read as zero rather than blank. */
-export function n0(value: Num): number {
-  return n(value) ?? 0;
-}
+// Re-exported so every screen keeps importing coercion from the same place it imports its
+// row types, even though the implementation now lives in a module the browser can also reach.
+// The separate `import type` is not redundant: a re-export forwards the name to consumers but
+// does not bring it into this file's own scope, and every row type below is written in terms
+// of it.
+import type { Num } from './num';
+export { n, n0 } from './num';
+export type { Num };
 
 // --- Row shapes -------------------------------------------------------------------------
 //
@@ -192,6 +179,84 @@ export type RecencyRow = {
 };
 
 export const getRecency = () => query<RecencyRow>('/api/stats/recency');
+
+/** Volume by movement pattern. No fan-out here — pattern is one column on the exercise. */
+export type PatternVolumeRow = {
+  pattern: string;
+  volume_lbs: Num;
+  sessions: number;
+  days: number;
+  distance_mi: Num;
+  duration_min: Num;
+};
+
+export const getVolumeByPattern = (days = 28) =>
+  query<PatternVolumeRow>('/api/stats/patterns', { days });
+
+export type ExerciseSession = {
+  date: string;
+  sets: number;
+  total_reps: number;
+  volume_lbs: Num;
+  top_weight: Num;
+  e1rm: Num;
+  distance_mi: Num;
+  duration_min: Num;
+  avg_rpe: Num;
+  set_detail: DaySet[];
+};
+
+export type ExerciseHistory = {
+  exercise: {
+    id: number;
+    name: string;
+    category: string | null;
+    pattern: string | null;
+    equipment: string | null;
+    notes: string | null;
+    muscles: { name: string; region: string; role: 'primary' | 'secondary' }[];
+  };
+  /** Oldest first, so it plots left to right. */
+  sessions: ExerciseSession[];
+};
+
+export const getExercise = (name: string) => queryOne<ExerciseHistory>('/api/stats/exercise', { name });
+
+/**
+ * Correct a food's macros. The only write the dashboard makes.
+ *
+ * Lives here so the secret stays in the one module that already holds it. Returns a plain
+ * result rather than throwing, because the caller is a form that has to render the failure.
+ */
+export async function updateFood(input: {
+  food_id: number;
+  name: string;
+  calories?: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+  confidence?: 'high' | 'medium' | 'low';
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!BACKEND_URL || !API_SECRET) {
+    return { ok: false, error: 'BACKEND_URL and API_SECRET are not set' };
+  }
+
+  try {
+    const response = await fetch(new URL('/api/foods', BACKEND_URL), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${API_SECRET}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const body = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!response.ok || !body?.ok) {
+      return { ok: false, error: body?.error ?? `Backend returned ${response.status}` };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Request failed' };
+  }
+}
 
 export type DaySet = {
   set_number: number;

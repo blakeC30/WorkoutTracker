@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { getPrs, n, type PrRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
@@ -65,7 +66,7 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
       ) : null}
 
       <p style={{ marginTop: 22, color: 'var(--ink-faint)', fontSize: 'var(--t-sm)', lineHeight: 1.5 }}>
-        Estimated max is Epley — weight × (1 + reps ÷ 30). It is an estimate from your best set,
+        Tap any lift for its full history. Estimated max is Epley — weight × (1 + reps ÷ 30). It is an estimate from your best set,
         not a single you have actually pulled.
       </p>
     </>
@@ -73,6 +74,14 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
 }
 
 function Weighted({ row, max, index }: { row: PrRow; max: number; index: number }) {
+  return (
+    <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
+      <WeightedBody row={row} max={max} index={index} />
+    </Link>
+  );
+}
+
+function WeightedBody({ row, max, index }: { row: PrRow; max: number; index: number }) {
   const e1rm = n(row.best_e1rm_lbs);
   const heaviest = n(row.heaviest_lbs);
   const stale = daysAgo(row.last_performed) > 28;
@@ -131,6 +140,14 @@ function Weighted({ row, max, index }: { row: PrRow; max: number; index: number 
 }
 
 function Endurance({ row }: { row: PrRow }) {
+  return (
+    <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
+      <EnduranceBody row={row} />
+    </Link>
+  );
+}
+
+function EnduranceBody({ row }: { row: PrRow }) {
   const distance = n(row.best_distance_mi);
   const duration = n(row.best_duration_min);
   const pace = n(row.best_pace_min_per_mi);

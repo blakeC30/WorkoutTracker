@@ -133,7 +133,6 @@ export function BarRow({
   value,
   max,
   display,
-  secondary,
   tone = 'var(--signal)',
   index = 0,
 }: {
@@ -141,14 +140,11 @@ export function BarRow({
   value: number;
   max: number;
   display: string;
-  /** A second, dimmer bar drawn behind the first — secondary muscle volume, in practice. */
-  secondary?: number;
   tone?: string;
   /** Position in its list, used only to stagger the draw. */
   index?: number;
 }) {
   const pct = max > 0 ? Math.max(value / max, 0) * 100 : 0;
-  const secondaryPct = max > 0 && secondary ? Math.max(secondary / max, 0) * 100 : 0;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '78px 1fr auto', alignItems: 'center', gap: 10, height: 26 }}>
@@ -160,20 +156,6 @@ export function BarRow({
           Each row starts a beat after the one above it, which reads as the list filling in
           rather than as five things twitching at once. */}
       <div style={{ position: 'relative', height: 10 }}>
-        {secondaryPct > 0 ? (
-          <div
-            className="draw-x"
-            style={
-              {
-                position: 'absolute',
-                inset: '0 auto 0 0',
-                width: `${secondaryPct}%`,
-                background: 'var(--signal-low)',
-                '--delay': `${index * 70 + 40}ms`,
-              } as CSSProperties
-            }
-          />
-        ) : null}
         <div
           className="draw-x"
           style={

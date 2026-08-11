@@ -94,6 +94,87 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
 }
 
 /**
+ * One exercise, every session of it, oldest first.
+ *
+ * The question this exists to answer is "am I getting stronger at this", which nothing else in
+ * the app could answer: `getPrs` returns a single current best per exercise, so a lift that has
+ * been stalled for two months and one that added 40lb last week look identical.
+ *
+ * Estimated 1RM is the series to plot rather than top weight, because it moves when reps go up
+ * at the same load — which is most of how progress actually arrives. Reps above 12 are excluded
+ * from the estimate for the same reason PRs exclude them: Epley drifts badly on long sets and a
+ * 20-rep back-off set would post a fake record.
+ */
+export async function getExerciseHistory(name: string, limit = 120) {
+  const sql = getSql();
+  const key = name.trim().toLowerCase();
+
+  const [meta] = await sql`
+    select e.id, e.name, e.category, e.pattern, e.equipment, e.notes,
+           coalesce(
+             (select json_agg(json_build_object('name', m.name, 'region', m.region, 'role', em.role)
+                     order by em.role, m.name)
+              from exercise_muscles em join muscles m on m.id = em.muscle_id
+              where em.exercise_id = e.id), '[]'::json) as muscles
+    from exercises e
+    where lower(e.name) = ${key}
+    limit 1`;
+
+  if (!meta) return null;
+
+  const sessions = await sql`
+    select w.entry_date::text as date,
+           count(s.id)::int                    as sets,
+           sum(s.reps)::int                    as total_reps,
+           round(sum(s.reps * s.weight_lbs))   as volume_lbs,
+           max(s.weight_lbs)                   as top_weight,
+           round(max(s.weight_lbs * (1 + s.reps::numeric / 30))
+                 filter (where s.reps <= 12))  as e1rm,
+           round(sum(s.distance_mi), 2)        as distance_mi,
+           round(sum(s.duration_min))          as duration_min,
+           round(avg(s.rpe), 1)                as avg_rpe,
+           coalesce((
+             select json_agg(json_build_object(
+                      'set_number', s2.set_number, 'reps', s2.reps, 'weight_lbs', s2.weight_lbs,
+                      'duration_min', s2.duration_min, 'distance_mi', s2.distance_mi, 'rpe', s2.rpe)
+                    order by s2.set_number)
+             from workout_sets s2 where s2.workout_id = w.id), '[]'::json) as set_detail
+    from workouts w
+    join workout_sets s on s.workout_id = w.id
+    where w.exercise_id = ${meta.id}
+    group by w.id, w.entry_date
+    order by w.entry_date desc
+    limit ${limit}`;
+
+  // Reversed here rather than in SQL: the LIMIT has to take the most RECENT sessions, but a
+  // chart has to read oldest-to-newest. Ordering ascending in the query would cap the history
+  // at the first 120 sessions ever recorded and then never move again.
+  return { exercise: meta, sessions: sessions.slice().reverse() };
+}
+
+/**
+ * Training volume by movement pattern.
+ *
+ * The muscle-region version of this has a fan-out trap; this one does not, because `pattern` is
+ * a single column on the exercise rather than a many-to-many join. One session counts once.
+ */
+export async function getVolumeByPattern(days = 28) {
+  const sql = getSql();
+  return sql`
+    select coalesce(e.pattern, 'other')          as pattern,
+           round(sum(s.reps * s.weight_lbs))     as volume_lbs,
+           count(distinct w.id)::int             as sessions,
+           count(distinct w.entry_date)::int     as days,
+           round(sum(s.distance_mi), 2)          as distance_mi,
+           round(sum(s.duration_min))            as duration_min
+    from workouts w
+    join exercises e on e.id = w.exercise_id
+    join workout_sets s on s.workout_id = w.id
+    where w.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+    group by 1`;
+}
+
+/**
  * Week-by-week rollup: training, nutrition and bodyweight side by side.
  *
  * Each metric is aggregated in its own CTE and joined on the week. Aggregating them in one

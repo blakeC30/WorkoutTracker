@@ -1,6 +1,7 @@
 import { getNutrition, getReview, n, n0, type ReviewRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { NutritionChart } from '@/components/NutritionChart';
+import { FoodEditor } from '@/components/FoodEditor';
 import { Reveal } from '@/components/motion';
 import { agoLabel, int } from '@/lib/format';
 
@@ -69,8 +70,8 @@ function Review({ result }: { result: Awaited<ReturnType<typeof getReview>> }) {
       ))}
 
       <p style={{ marginTop: 18, color: 'var(--ink-faint)', fontSize: 'var(--t-sm)', lineHeight: 1.5 }}>
-        Tell Claude the real numbers for any of these and it corrects the food itself — every
-        past meal using it moves with it, including the days above.
+        Tap a row to correct its macros. Every past meal using that food moves with it, including
+        the days in the chart above.
       </p>
     </Section>
   );
@@ -81,6 +82,9 @@ function Item({ row }: { row: ReviewRow }) {
 
   return (
     <div style={{ padding: '12px 0', borderTop: '1px solid var(--rule)' }}>
+      {/* The row itself opens the editor. The queue used to end at "this number is wrong" and
+          require a conversation elsewhere to fix it; this closes the loop where you're standing. */}
+      <FoodEditor row={row}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <span className="selectable" style={{ lineHeight: 1.25, minWidth: 0 }}>
           {row.name}
@@ -116,6 +120,7 @@ function Item({ row }: { row: ReviewRow }) {
         </span>
         <span>{agoLabel(row.last_eaten)}</span>
       </div>
+      </FoodEditor>
     </div>
   );
 }

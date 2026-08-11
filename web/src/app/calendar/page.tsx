@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { getCalendar, getRecency, n, n0, type CalendarRow, type RecencyRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Empty, Fault } from '@/components/ui';
+import { getCalendar, getWeeks, n, n0, type CalendarRow } from '@/lib/backend';
+import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
-import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
-import { compact, dec, int, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
+import { PATTERNS } from '@/lib/patterns';
+import { WeekLedger } from '@/components/WeekLedger';
+import { dec, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,7 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
   const key = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : monthKey(today());
   const shape = monthShape(key);
 
-  const [result, recency] = await Promise.all([getCalendar(shape.from, shape.to), getRecency()]);
+  const [result, weeks] = await Promise.all([getCalendar(shape.from, shape.to), getWeeks(8)]);
 
   return (
     <main className="screen">
@@ -54,13 +55,19 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
 
           <Rule />
           <Reveal delay={180}>
-            <Recency result={recency} />
-          </Reveal>
-
-          <Rule />
-          <Reveal delay={240}>
             <Totals rows={result.rows} monthKey={key} />
           </Reveal>
+
+          {/* The eight-week ledger, absorbed from what used to be its own tab. Same question as
+              the grid above — have I been consistent — one zoom level out. */}
+          {weeks.ok && weeks.rows.length > 0 ? (
+            <>
+              <Rule />
+              <Reveal delay={240}>
+                <WeekLedger weeks={weeks.rows} />
+              </Reveal>
+            </>
+          ) : null}
         </>
       ) : (
         <Fault error={result.error} />
@@ -374,72 +381,15 @@ function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
 
 // --- Days since --------------------------------------------------------------------------
 
-/**
- * How long since each pattern was last trained, most overdue first.
- *
- * Comes from its own endpoint rather than from the month above, because the month above cannot
- * answer it: if you last trained pull in June and you are looking at August, nothing in these
- * rows knows that pull exists.
- */
-function Recency({ result }: { result: Awaited<ReturnType<typeof getRecency>> }) {
-  if (!result.ok) {
-    return (
-      <Section label="Last trained">
-        <Fault error={result.error} />
-      </Section>
-    );
-  }
-  if (result.rows.length === 0) {
-    return (
-      <Section label="Last trained">
-        <Empty>No sessions recorded yet.</Empty>
-      </Section>
-    );
-  }
-
-  return (
-    <Section label="Last trained" aside="all time">
-      <div style={{ display: 'flex', gap: 10 }}>
-        {result.rows.map((row) => (
-          <Gap key={row.pattern} row={row} />
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-function Gap({ row }: { row: RecencyRow }) {
-  const days = row.days_since;
-  const label = patternLabel(row.pattern);
-
-  // The pattern's colour identifies WHICH, and a rule under the label carries it — but the
-  // number itself stays plain ink so a long gap is not mistaken for a different category.
-  // Overdue is signalled by the flag colour on the number alone.
-  const overdue = days === null || days >= 7;
-
-  return (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div
-        className="cap"
-        style={{ color: 'var(--ink-faint)', borderBottom: `2px solid ${patternColor(row.pattern)}`, paddingBottom: 3 }}
-      >
-        {label}
-      </div>
-      <div
-        className="mono"
-        style={{ fontSize: 'var(--t-lg)', marginTop: 5, color: overdue ? 'var(--flag)' : 'var(--ink)' }}
-      >
-        {days === null ? '—' : days === 0 ? 'today' : days}
-        {days !== null && days > 0 ? (
-          <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)' }}>d</span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 // --- Month totals ------------------------------------------------------------------------
 
+/**
+ * What the grid above cannot show: how much of the month got logged at all.
+ *
+ * The volume, cardio and calorie totals that used to live here were a straight duplicate of the
+ * eight-week ledger further down the same screen. What is left is the coverage question — days
+ * trained and days fed, against days elapsed — which nothing else reports.
+ */
 function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }) {
   if (rows.length === 0) {
     return (
@@ -449,32 +399,25 @@ function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
     );
   }
 
-  const trained = rows.filter((r) => r.sets > 0);
-  const volume = rows.reduce((sum, r) => sum + n0(r.volume_lbs), 0);
-  const cardio = rows.reduce((sum, r) => sum + n0(r.cardio_mi), 0);
-  const fed = rows.filter((r) => r.items > 0);
-  const avgCalories = fed.reduce((sum, r) => sum + n0(r.calories), 0) / (fed.length || 1);
+  const elapsed = elapsedDays(key);
+  const trained = rows.filter((r) => r.sets > 0).length;
+  const fed = rows.filter((r) => r.items > 0).length;
 
   const weighed = rows.filter((r) => n(r.weight_lbs) !== null);
   const weightChange =
     weighed.length > 1 ? n0(weighed[weighed.length - 1].weight_lbs) - n0(weighed[0].weight_lbs) : null;
 
   return (
-    <Section label="Month" aside={`${trained.length} training days`}>
-      <Figure value={int(volume)} unit="LB VOLUME" count={volume} />
-      <div style={{ display: 'flex', gap: 24, marginTop: 16, flexWrap: 'wrap' }}>
-        <Stat label="Cardio" value={dec(cardio, 1)} unit="MI" />
-        <Stat label="Avg kcal" value={fed.length ? int(avgCalories) : '—'} />
+    <Section label="Month" aside={`${elapsed} days so far`}>
+      <div style={{ display: 'flex', gap: 26 }}>
+        <Stat label="Trained" value={`${trained}`} unit={`/ ${elapsed}`} />
+        <Stat label="Food logged" value={`${fed}`} unit={`/ ${elapsed}`} />
         <Stat
           label="Weight"
           value={weightChange === null ? '—' : `${weightChange > 0 ? '+' : ''}${dec(weightChange)}`}
           unit={weightChange === null ? undefined : 'LB'}
           tone={weightChange === null ? undefined : weightChange > 0 ? 'var(--up)' : 'var(--down)'}
         />
-      </div>
-      <div className="cap" style={{ marginTop: 14, color: 'var(--ink-faint)' }}>
-        Food logged {fed.length}/{elapsedDays(key)} days · busiest{' '}
-        {compact(Math.max(...rows.map((r) => n0(r.volume_lbs))))} lb
       </div>
     </Section>
   );
