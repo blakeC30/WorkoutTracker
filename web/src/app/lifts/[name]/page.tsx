@@ -94,6 +94,54 @@ function Progress({ sessions, tone }: { sessions: ExerciseSession[]; tone: strin
   const loaded = sessions.filter((s) => n(s.e1rm) !== null);
   const endurance = sessions.filter((s) => n(s.distance_mi) !== null || n(s.duration_min) !== null);
 
+  // Bodyweight work: reps at no load. This branch did not exist, and because such a session has
+  // no e1RM, no distance and no duration, BOTH other branches came up empty — `endurance[last]`
+  // was undefined and reading its date threw, so a push-up's detail page rendered as a blank
+  // shell. The record is the best single set, mirroring how the loaded branch reports e1RM.
+  const repped = sessions
+    .map((s) => ({
+      date: s.date,
+      best: Math.max(...s.set_detail.filter((d) => n0(d.weight_lbs) === 0).map((d) => d.reps ?? 0), 0),
+      total: s.total_reps,
+    }))
+    .filter((s) => s.best > 0);
+
+  if (loaded.length === 0 && endurance.length === 0 && repped.length > 0) {
+    const series = repped.map((s) => s.best);
+    const latest = repped[repped.length - 1];
+    const best = Math.max(...series);
+
+    return (
+      <Section label="Best set" aside={`${sessions.length} session${sessions.length === 1 ? '' : 's'}`}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+          <Figure value={String(latest.best)} unit="REPS" size="var(--t-3xl)" count={latest.best} tone={tone} />
+          <Delta
+            value={series.length > 1 ? latest.best - series[0] : null}
+            unit="reps"
+            over={`${series.length} session${series.length === 1 ? '' : 's'}`}
+          />
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <Sparkline points={series} height={58} tone={tone} />
+        </div>
+        <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+          <span>Best {best} in a set</span>
+          <span style={{ color: 'var(--ink-faint)' }}>{int(latest.total)} reps last session</span>
+        </div>
+      </Section>
+    );
+  }
+
+  // Nothing measurable at all. Reachable if a session recorded only notes, and it must render
+  // something rather than fall through to code that assumes a series exists.
+  if (loaded.length === 0 && endurance.length === 0) {
+    return (
+      <Section label="Sessions" aside={`${sessions.length}`}>
+        <Empty>Recorded, but with no weight, reps, distance or time to chart.</Empty>
+      </Section>
+    );
+  }
+
   if (loaded.length === 0) {
     // Cardio and timed work have no estimated max; distance is the series that means something.
     const series = endurance.map((s) => n0(s.distance_mi) || n0(s.duration_min));
@@ -106,7 +154,7 @@ function Progress({ sessions, tone }: { sessions: ExerciseSession[]; tone: strin
     const current = isDistance ? n(latest?.distance_mi) : n(latest?.duration_min);
 
     return (
-      <Section label={isDistance ? 'Distance' : 'Duration'} aside={`${sessions.length} sessions`}>
+      <Section label={isDistance ? 'Distance' : 'Duration'} aside={`${sessions.length} session${sessions.length === 1 ? '' : 's'}`}>
         <Figure
           value={dec(current, 2)}
           unit={isDistance ? 'MI' : 'MIN'}
@@ -137,10 +185,10 @@ function Progress({ sessions, tone }: { sessions: ExerciseSession[]; tone: strin
   const change = series.length > 1 ? current - first : null;
 
   return (
-    <Section label="Estimated 1RM" aside={`${sessions.length} sessions`}>
+    <Section label="Estimated 1RM" aside={`${sessions.length} session${sessions.length === 1 ? '' : 's'}`}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
         <Figure value={int(current)} unit="LB" size="var(--t-3xl)" count={current} tone={tone} />
-        <Delta value={change} unit="lb" over={`${loaded.length} sessions`} />
+        <Delta value={change} unit="lb" over={`${loaded.length} session${loaded.length === 1 ? '' : 's'}`} />
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -232,11 +280,15 @@ function SessionRow({
             <span style={{ color: 'var(--ink-faint)' }}> · {agoLabel(session.date).toLowerCase()}</span>
           </span>
           <span className="mono" style={{ fontSize: 'var(--t-sm)', color: 'var(--ink)' }}>
+            {/* Reps last, but they must be here: a push-up session has no e1RM, no distance and
+                no duration, and without this arm every row read "— min". */}
             {e1rm !== null
               ? `${int(e1rm)} e1RM`
               : distance !== null
                 ? `${dec(distance, 2)} mi`
-                : `${dec(duration, 0)} min`}
+                : duration !== null
+                  ? `${dec(duration, 0)} min`
+                  : `${int(session.total_reps)} reps`}
           </span>
         </div>
 

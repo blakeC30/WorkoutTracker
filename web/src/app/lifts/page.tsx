@@ -35,11 +35,13 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
   // Split rather than mixed: a pace and a one-rep max are not comparable, and interleaving them
   // makes both columns meaningless.
   const weighted = result.rows.filter((r) => r.record_type === 'weighted');
+  const bodyweight = result.rows.filter((r) => r.record_type === 'bodyweight');
   const endurance = result.rows.filter((r) => r.record_type === 'endurance');
 
   // The scale for the e1RM bars. Squats dwarf curls, so this is a rough sense of where the
   // heavy work sits, not a claim that the exercises are comparable.
   const maxE1rm = Math.max(...weighted.map((r) => n(r.best_e1rm_lbs) ?? 0), 1);
+  const maxReps = Math.max(...bodyweight.map((r) => r.best_reps ?? 0), 1);
 
   return (
     <>
@@ -53,7 +55,22 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
         </Reveal>
       ) : null}
 
-      {weighted.length > 0 && endurance.length > 0 ? <Rule /> : null}
+      {weighted.length > 0 && bodyweight.length > 0 ? <Rule /> : null}
+
+      {/* Push-ups, sit-ups, pull-ups. Their own section because their record is reps at no
+          load, which is neither a tonnage PR nor a distance — before this they fell through to
+          "Cardio & timed" and rendered as an em-dash. */}
+      {bodyweight.length > 0 ? (
+        <Reveal>
+          <Section label="Bodyweight" aside={`${bodyweight.length}`}>
+            {bodyweight.map((row, i) => (
+              <Calisthenic key={row.exercise} row={row} max={maxReps} index={i} />
+            ))}
+          </Section>
+        </Reveal>
+      ) : null}
+
+      {(weighted.length > 0 || bodyweight.length > 0) && endurance.length > 0 ? <Rule /> : null}
 
       {endurance.length > 0 ? (
         <Reveal>
@@ -201,6 +218,79 @@ function EnduranceBody({ row }: { row: PrRow }) {
         </span>
         <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
           {row.total_sets} sessions · {agoLabel(row.last_performed).toLowerCase()}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A bodyweight exercise: push-ups, sit-ups, pull-ups.
+ *
+ * The headline is the best single SET, not the running total — adding a rep to your best set is
+ * the calisthenic equivalent of adding weight to the bar, whereas total reps mostly measures how
+ * long you spent. The total is still shown, in the meta line where volume sits on a loaded row.
+ */
+function Calisthenic({ row, max, index }: { row: PrRow; max: number; index: number }) {
+  return (
+    <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
+      <CalisthenicBody row={row} max={max} index={index} />
+    </Link>
+  );
+}
+
+function CalisthenicBody({ row, max, index }: { row: PrRow; max: number; index: number }) {
+  const best = row.best_reps;
+  const stale = daysAgo(row.last_performed) > 28;
+  const pct = best !== null ? (best / max) * 100 : 0;
+
+  return (
+    <div style={{ padding: '12px 0', borderTop: '1px solid var(--rule)', opacity: stale ? 0.55 : 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+        <span className="selectable" style={{ fontSize: 'var(--t-base)', lineHeight: 1.2 }}>
+          {row.exercise}
+          <span className="cap" style={{ color: patternColor(row.pattern), marginLeft: 8 }}>
+            {patternLabel(row.pattern)}
+          </span>
+        </span>
+        <span className="mono" style={{ fontSize: 'var(--t-xl)', fontWeight: 500, lineHeight: 1 }}>
+          {best ?? '—'}
+          <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 4 }}>REPS</span>
+        </span>
+      </div>
+
+      <div style={{ height: 3, background: 'var(--rule)', margin: '9px 0 8px' }}>
+        <div
+          className="draw-x"
+          style={
+            {
+              width: `${pct}%`,
+              height: '100%',
+              background: patternColor(row.pattern),
+              '--delay': `${index * 45}ms`,
+            } as CSSProperties
+          }
+        />
+      </div>
+
+      {/* Same treatment as the endurance rows: two unbreakable groups, short labels. Spelling
+          out "best set, 10 AUG" and "last yesterday" ran past 350px and wrapped mid-phrase. */}
+      <div
+        className="mono"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          fontSize: 'var(--t-cap)',
+          color: 'var(--ink-faint)',
+        }}
+      >
+        <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-dim)' }}>
+          best {row.best_reps_on ? shortDay(row.best_reps_on) : '—'}
+        </span>
+        <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+          {row.total_bodyweight_reps !== null ? `${int(row.total_bodyweight_reps)} reps · ` : ''}
+          {row.total_sets} sets · {agoLabel(row.last_performed).toLowerCase()}
         </span>
       </div>
     </div>

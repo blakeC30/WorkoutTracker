@@ -124,7 +124,15 @@ export type PrRow = {
   exercise: string;
   category: string | null;
   pattern: string | null;
-  record_type: 'weighted' | 'endurance';
+  /**
+   * Three kinds of record, because three kinds of set exist. `bodyweight` covers push-ups,
+   * sit-ups and pull-ups — reps at no load, which match neither a tonnage PR nor a distance.
+   */
+  record_type: 'weighted' | 'bodyweight' | 'endurance';
+  /** Most reps in a single unloaded set. The calisthenic equivalent of a heaviest single. */
+  best_reps: number | null;
+  best_reps_on: string | null;
+  total_bodyweight_reps: number | null;
   heaviest_lbs: Num;
   heaviest_reps: number | null;
   heaviest_on: string | null;

@@ -55,6 +55,23 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
       select distinct on (exercise_id) exercise_id, e1rm, weight_lbs, reps, entry_date
       from weighted order by exercise_id, e1rm desc, entry_date asc
     ),
+    -- Bodyweight work: push-ups, sit-ups, pull-ups, air squats.
+    --
+    -- A third kind of record, and the one this query used to have no notion of. These sets
+    -- carry reps but no load, so they never enter the weighted CTE, and they carry no distance
+    -- or duration either, so they never enter the endurance one. The result was that a push-up filed
+    -- itself under "Cardio & timed" with every metric null and rendered as an em-dash — three
+    -- sets and fifty-three reps reported as nothing at all.
+    --
+    -- The record here is the best SET, not the total: adding a rep to your best set is the
+    -- calisthenic equivalent of adding weight to the bar, while total reps mostly tracks how
+    -- long you spent.
+    calisthenic as (
+      select distinct on (exercise_id) exercise_id, reps, entry_date
+      from matched
+      where reps is not null and coalesce(weight_lbs, 0) = 0
+      order by exercise_id, reps desc, entry_date asc
+    ),
     -- Unloaded work: cardio and timed holds. Without this, running, rowing and planks have
     -- no record of any kind and simply vanish from the list — the longest run of the block
     -- is as much a PR as the heaviest single.
@@ -69,7 +86,14 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
       group by exercise_id
     )
     select m.exercise, m.category, m.pattern,
-           case when h.exercise_id is not null then 'weighted' else 'endurance' end as record_type,
+           -- Loaded wins when an exercise has both: a weighted pull-up is measured by the
+           -- weight, and the bodyweight sets still count toward its total.
+           case when h.exercise_id is not null then 'weighted'
+                when c.exercise_id is not null then 'bodyweight'
+                else 'endurance' end as record_type,
+           c.reps              as best_reps,
+           c.entry_date::text  as best_reps_on,
+           sum(m.reps) filter (where coalesce(m.weight_lbs, 0) = 0)::int as total_bodyweight_reps,
            h.weight_lbs        as heaviest_lbs,
            h.reps              as heaviest_reps,
            h.entry_date::text  as heaviest_on,
@@ -86,9 +110,11 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
     left join heaviest  h  on h.exercise_id  = m.exercise_id
     left join best_e1rm b  on b.exercise_id  = m.exercise_id
     left join endurance en on en.exercise_id = m.exercise_id
+    left join calisthenic c on c.exercise_id = m.exercise_id
     group by m.exercise, m.category, m.pattern, h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
              b.e1rm, b.weight_lbs, b.reps, b.entry_date,
-             en.best_distance_mi, en.best_duration_min, en.best_pace_min_per_mi
+             en.best_distance_mi, en.best_duration_min, en.best_pace_min_per_mi,
+             c.exercise_id, c.reps, c.entry_date
     order by max(m.entry_date) desc
     limit ${limit}`;
 }
