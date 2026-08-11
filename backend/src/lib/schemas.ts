@@ -18,18 +18,19 @@ export const entryDate = z
       'If the user says "yesterday I squatted", this is yesterday.',
   );
 
-/**
- * Exercise names are normalized on the way in: lowercased and trimmed.
+/*
+ * There is deliberately no name-normalising transform here.
  *
- * Without this, "Bench Press" and "bench press" become two different exercises, which
- * breaks both the one-row-per-exercise-per-day constraint and PR tracking. Doing it here
- * — in one place, at the edge — is simpler than normalizing at every query.
+ * There used to be: `exerciseName` lowercased and trimmed, with a comment claiming it stopped
+ * "Bench Press" and "bench press" becoming two exercises. It was never imported anywhere, so it
+ * never once ran — and it was the wrong fix regardless. Lowercasing on the way in destroys what
+ * cannot be recovered: RDL becomes rdl, McDonald's becomes mcdonald's, and no amount of
+ * capitalising at display time gets them back, because title-casing every word produces Rdl and
+ * Mcdonald's.
+ *
+ * Names are stored exactly as written. Duplicates are prevented by the case-insensitive unique
+ * indexes from migration 007, which is where that job belongs.
  */
-export const exerciseName = z
-  .string()
-  .min(1)
-  .transform((s) => s.trim().toLowerCase())
-  .describe('Exercise name, e.g. "back squat", "bench press", "running".');
 
 /** One set. Cardio is a single set carrying distance and/or duration. */
 export const setInput = z.object({

@@ -84,7 +84,10 @@ export async function logEntry(
         const { rows } = await client.query<{ id: string; name: string; created: boolean }>(
           `insert into exercises (name, aliases, category, pattern, equipment, notes)
            values ($1, coalesce($2::text[],'{}'), $3, $4, $5, $6)
-           on conflict (name) do update set
+           -- Conflict on lower(name), matching the case-insensitive unique index from 007:
+           -- logging "Bench Press" after "bench press" updates the existing row instead of
+           -- creating a second exercise that splits the history.
+           on conflict (lower(name)) do update set
              aliases   = (select coalesce(array_agg(distinct a), '{}')
                           from unnest(exercises.aliases || excluded.aliases) a),
              category  = coalesce(excluded.category,  exercises.category),
@@ -213,7 +216,7 @@ export async function logEntry(
              (name, unit_label, calories, protein_g, carbs_g, fat_g, aliases, source_url,
               confidence, notes)
            values ($1, coalesce($2,'serving'), $3, $4, $5, $6, coalesce($7::text[],'{}'), $8, $9, $10)
-           on conflict (name) do update set
+           on conflict (lower(name)) do update set
              unit_label = coalesce(excluded.unit_label, foods.unit_label),
              calories   = coalesce(excluded.calories,   foods.calories),
              protein_g  = coalesce(excluded.protein_g,  foods.protein_g),
@@ -447,7 +450,7 @@ export async function saveFood(input: {
             ${input.protein_g ?? null}, ${input.carbs_g ?? null}, ${input.fat_g ?? null},
             ${input.aliases ?? []}, ${input.source_url ?? null}, ${input.confidence ?? null},
             ${input.notes ?? null})
-    on conflict (name) do update set
+    on conflict (lower(name)) do update set
       unit_label = coalesce(excluded.unit_label, foods.unit_label),
       calories   = coalesce(excluded.calories,   foods.calories),
       protein_g  = coalesce(excluded.protein_g,  foods.protein_g),

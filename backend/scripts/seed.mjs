@@ -138,7 +138,7 @@ async function main() {
         // corrected by hand is never overwritten by a re-run.
         `insert into exercises (name, aliases, category, pattern, equipment, is_seed)
          values ($1, $2::text[], $3, $4, $5, true)
-         on conflict (name) do update set
+         on conflict (lower(name)) do update set
            is_seed = exercises.is_seed,
            pattern = coalesce(exercises.pattern, excluded.pattern)
          returning id`,
@@ -164,7 +164,7 @@ async function main() {
         `insert into foods (name, unit_label, calories, protein_g, carbs_g, fat_g,
                             aliases, confidence, is_seed)
          values ($1, $2, $3, $4, $5, $6, $7::text[], $8, true)
-         on conflict (name) do update set is_seed = foods.is_seed
+         on conflict (lower(name)) do update set is_seed = foods.is_seed
          returning id`,
         [fd.name, fd.unit, fd.kcal, fd.p, fd.c, fd.f, fd.aliases, fd.conf],
       );
