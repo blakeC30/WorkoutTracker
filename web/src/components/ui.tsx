@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Counter } from './motion';
 
 /*
  * The vocabulary the screens are built from. All of it renders on the server — none of these
@@ -71,15 +72,24 @@ export function Figure({
   unit,
   size = 'var(--t-2xl)',
   tone = 'var(--ink)',
+  count,
+  decimals = 0,
 }: {
   value: string;
   unit?: string;
   size?: string;
   tone?: string;
+  /**
+   * Pass the raw number to have the figure settle into it on arrival. `value` stays the
+   * server-rendered string, so the correct number is in the HTML either way — the count is
+   * decoration over a already-correct value, never the source of it.
+   */
+  count?: number | null;
+  decimals?: number;
 }) {
   return (
     <span className="mono" style={{ color: tone, fontSize: size, fontWeight: 500, lineHeight: 1 }}>
-      {value}
+      {count !== undefined && count !== null ? <Counter value={count} decimals={decimals} /> : value}
       {unit ? (
         <span style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-dim)', marginLeft: 6, fontWeight: 400 }}>
           {unit}
@@ -125,6 +135,7 @@ export function BarRow({
   display,
   secondary,
   tone = 'var(--signal)',
+  index = 0,
 }: {
   label: string;
   value: number;
@@ -133,6 +144,8 @@ export function BarRow({
   /** A second, dimmer bar drawn behind the first — secondary muscle volume, in practice. */
   secondary?: number;
   tone?: string;
+  /** Position in its list, used only to stagger the draw. */
+  index?: number;
 }) {
   const pct = max > 0 ? Math.max(value / max, 0) * 100 : 0;
   const secondaryPct = max > 0 && secondary ? Math.max(secondary / max, 0) * 100 : 0;
@@ -142,18 +155,37 @@ export function BarRow({
       <span className="cap" style={{ color: 'var(--ink-dim)', letterSpacing: '0.08em' }}>
         {label}
       </span>
+      {/* Both bars draw to length on arrival. The width in the HTML is already final — the
+          animation is scaleX from 0, so it composites on the GPU and never reflows the row.
+          Each row starts a beat after the one above it, which reads as the list filling in
+          rather than as five things twitching at once. */}
       <div style={{ position: 'relative', height: 10 }}>
         {secondaryPct > 0 ? (
           <div
-            style={{
-              position: 'absolute',
-              inset: '0 auto 0 0',
-              width: `${secondaryPct}%`,
-              background: 'var(--signal-low)',
-            }}
+            className="draw-x"
+            style={
+              {
+                position: 'absolute',
+                inset: '0 auto 0 0',
+                width: `${secondaryPct}%`,
+                background: 'var(--signal-low)',
+                '--delay': `${index * 70 + 40}ms`,
+              } as CSSProperties
+            }
           />
         ) : null}
-        <div style={{ position: 'absolute', inset: '0 auto 0 0', width: `${pct}%`, background: tone }} />
+        <div
+          className="draw-x"
+          style={
+            {
+              position: 'absolute',
+              inset: '0 auto 0 0',
+              width: `${pct}%`,
+              background: tone,
+              '--delay': `${index * 70}ms`,
+            } as CSSProperties
+          }
+        />
       </div>
       <span className="mono" style={{ fontSize: 'var(--t-sm)', color: 'var(--ink)' }}>
         {display}
@@ -201,8 +233,13 @@ export function Sparkline({
       style={{ width: '100%', height, display: 'block', overflow: 'visible' }}
       aria-hidden="true"
     >
-      {fill ? <path d={area} fill={tone} opacity={0.12} /> : null}
-      <path d={line} fill="none" stroke={tone} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      {/* Line and fill wipe on together under one clip, so the shaded area arrives with the
+          line rather than chasing it. The fill gets its own opacity keyframe because a CSS
+          `opacity: 1` from a generic reveal would beat the 0.12 attribute and flood the panel. */}
+      <g className="wipe-x">
+        {fill ? <path d={area} fill={tone} className="fill-in" /> : null}
+        <path d={line} fill="none" stroke={tone} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      </g>
       {/* The current value gets a mark; every other point does not. One focal point.
           Drawn as a zero-length round-capped LINE rather than a <circle>: the viewBox is
           stretched unequally by preserveAspectRatio="none", which turns a circle into an
@@ -216,6 +253,7 @@ export function Sparkline({
         strokeWidth={5}
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
+        className="mark-in"
       />
     </svg>
   );

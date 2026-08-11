@@ -139,6 +139,7 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
 
       <div
         ref={plot}
+        className="chart-in"
         style={{ height: 168, margin: '14px -6px 0', position: 'relative', touchAction: 'pan-y' }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);

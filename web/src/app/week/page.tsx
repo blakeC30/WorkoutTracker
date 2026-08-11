@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
 import { getWeeks, n, n0, type WeekRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch } from '@/components/ui';
+import { Reveal } from '@/components/motion';
 import { compact, dec, int, isoWeek, parseDay, shortDay } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -48,36 +50,45 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getWeeks>> }) {
 
   return (
     <>
-      <Section label="This week" aside={`${current.training_days}/7 days`}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <Figure value={int(n(current.volume_lbs))} unit="LB VOLUME" size="var(--t-2xl)" />
-          {lastWeekVolume !== null ? (
-            <span className="mono" style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-faint)' }}>
-              {compact(lastWeekVolume)} last wk
-            </span>
-          ) : null}
-        </div>
-        <div style={{ display: 'flex', gap: 26, marginTop: 16 }}>
-          <Stat label="Sets" value={String(current.total_sets)} />
-          <Stat label="Cardio" value={dec(n(current.cardio_miles))} unit="MI" />
-          <Stat label="Avg kcal" value={int(n(current.avg_calories))} />
+      <Reveal>
+        <Section label="This week" aside={`${current.training_days}/7 days`}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <Figure
+              value={int(n(current.volume_lbs))}
+              unit="LB VOLUME"
+              size="var(--t-2xl)"
+              count={n(current.volume_lbs)}
+            />
+            {lastWeekVolume !== null ? (
+              <span className="mono" style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-faint)' }}>
+                {compact(lastWeekVolume)} last wk
+              </span>
+            ) : null}
+          </div>
+          <div style={{ display: 'flex', gap: 26, marginTop: 16 }}>
+            <Stat label="Sets" value={String(current.total_sets)} />
+            <Stat label="Cardio" value={dec(n(current.cardio_miles))} unit="MI" />
+            <Stat label="Avg kcal" value={int(n(current.avg_calories))} />
           <Stat label="Weight" value={dec(n(current.avg_weight_lbs))} unit="LB" />
-        </div>
-      </Section>
+          </div>
+        </Section>
+      </Reveal>
 
       <Rule />
 
-      <Section label="Eight weeks" aside="volume">
-        <div>
-          {weeks.map((week) => (
-            <WeekLine key={week.week_starting} week={week} max={maxVolume} />
-          ))}
-        </div>
-        <div className="cap" style={{ marginTop: 14, color: 'var(--ink-faint)' }}>
-          <Swatch tone="var(--signal)" />
-          Each row: volume bar, training days, avg kcal, avg weight
-        </div>
-      </Section>
+      <Reveal delay={80}>
+        <Section label="Eight weeks" aside="volume">
+          <div>
+            {weeks.map((week, i) => (
+              <WeekLine key={week.week_starting} week={week} max={maxVolume} index={i} />
+            ))}
+          </div>
+          <div className="cap" style={{ marginTop: 14, color: 'var(--ink-faint)' }}>
+            <Swatch tone="var(--signal)" />
+            Each row: volume bar, training days, avg kcal, avg weight
+          </div>
+        </Section>
+      </Reveal>
     </>
   );
 }
@@ -89,7 +100,7 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getWeeks>> }) {
  * being dropped. Absence is information on a training log — the gaps are the story of a block
  * as much as the peaks are.
  */
-function WeekLine({ week, max }: { week: WeekRow; max: number }) {
+function WeekLine({ week, max, index }: { week: WeekRow; max: number; index: number }) {
   const volume = n0(week.volume_lbs);
   const pct = (volume / max) * 100;
   const skipped = week.training_days === 0;
@@ -120,9 +131,32 @@ function WeekLine({ week, max }: { week: WeekRow; max: number }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ position: 'relative', height: 12, flex: 1 }}>
             {skipped ? (
-              <div style={{ position: 'absolute', insetInline: 0, top: 5, height: 1, background: 'var(--rule)' }} />
+              <div
+                className="draw-x"
+                style={
+                  {
+                    position: 'absolute',
+                    insetInline: 0,
+                    top: 5,
+                    height: 1,
+                    background: 'var(--rule)',
+                    '--delay': `${index * 55}ms`,
+                  } as CSSProperties
+                }
+              />
             ) : (
-              <div style={{ position: 'absolute', inset: '0 auto 0 0', width: `${pct}%`, background: 'var(--signal)' }} />
+              <div
+                className="draw-x"
+                style={
+                  {
+                    position: 'absolute',
+                    inset: '0 auto 0 0',
+                    width: `${pct}%`,
+                    background: 'var(--signal)',
+                    '--delay': `${index * 55}ms`,
+                  } as CSSProperties
+                }
+              />
             )}
           </div>
           <span className="mono" style={{ fontSize: 'var(--t-sm)', minWidth: 44, textAlign: 'right' }}>

@@ -1,6 +1,7 @@
 import { getNutrition, getReview, n, n0, type ReviewRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { NutritionChart } from '@/components/NutritionChart';
+import { Reveal } from '@/components/motion';
 import { agoLabel, int } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -12,19 +13,23 @@ export default async function Food() {
     <main className="screen">
       <Masthead left="Food" right="30 days" />
 
-      {nutrition.ok ? (
-        nutrition.rows.length > 0 ? (
-          <NutritionChart rows={nutrition.rows} />
+      <Reveal>
+        {nutrition.ok ? (
+          nutrition.rows.length > 0 ? (
+            <NutritionChart rows={nutrition.rows} />
+          ) : (
+            <Empty>No meals logged in the last 30 days.</Empty>
+          )
         ) : (
-          <Empty>No meals logged in the last 30 days.</Empty>
-        )
-      ) : (
-        <Fault error={nutrition.error} />
-      )}
+          <Fault error={nutrition.error} />
+        )}
+      </Reveal>
 
       <Rule />
 
-      <Review result={review} />
+      <Reveal delay={80}>
+        <Review result={review} />
+      </Reveal>
     </main>
   );
 }

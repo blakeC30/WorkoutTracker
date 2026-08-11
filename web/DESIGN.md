@@ -111,10 +111,39 @@ no legend, no rounded bar caps, no dot on every point. Axis ticks are mono `11px
 
 ## Motion
 
-- No entrance animation. Nothing fades in on scroll, nothing staggers.
-- Press feedback only: `opacity .12s ease-out` / `background .12s ease-out`.
-- Data transitions may animate to make change legible; decoration may not.
-- Everything above collapses to nothing under `prefers-reduced-motion: reduce`.
+The app animates, and the test every animation has to pass is: **does the movement carry a
+reading?** A bar growing to length is showing you its magnitude. A number settling is an
+instrument finding its value. A marker sliding between tabs is telling you the four are one
+row. Motion that only signals *this app has motion* is the thing to cut.
+
+Easing is one curve, `--settle` (`cubic-bezier(.16,1,.3,1)`): fast off the mark, long slow
+arrival. Things come to rest the way a needle does.
+
+| What | How | Why it earns it |
+| --- | --- | --- |
+| Bars, all screens | `scaleX(0→1)`, 750ms, staggered 45–70ms down a list | The growth *is* the magnitude; the stagger reads as a list filling in |
+| Sparkline | `stroke-dashoffset` draw, 1.1s, fill and end-marker behind it | Draws left to right, so it reads as time passing |
+| Headline figures | Count to value, 900ms, `easeOutQuart` | A gauge powering on. Small values settle from ~97%; totals over 400 sweep from zero, where the sweep is the sense of scale |
+| Sections | Rise 14px + fade on entering view, 60–180ms apart | The only scroll-triggered motion in the app |
+| Tab marker | `translateX`, 340ms | One marker that moves, not four that blink |
+| Backdrop grid | `translateY` at 0.18× scroll | The app's only parallax |
+| Nutrition bars | Fill colour, 180ms, on scrub | The one motion that answers *you* rather than page load |
+
+Rules that constrain all of it:
+
+- **Only `transform`, `opacity`, `stroke-dashoffset` and `fill`.** Never width, height, top or
+  left. Nothing animated may cause layout during a scroll.
+- **Parallax goes behind the data, never through it.** The backdrop is a measurement grid at
+  0.18× scroll, giving the numbers a plane to sit above. Content itself never moves at its own
+  speed — a screen of figures sliding around is harder to read, which is the opposite of the job.
+- **Recharts' built-in animation stays off.** It replays on prop change and the scrub handler
+  changes props every frame; the bars are animated once from CSS instead.
+- **Correct values are always in the server HTML.** `Counter` rewrites `textContent` on a ref
+  rather than holding the number in state, so no JavaScript means no animation — never a blank.
+- **A reveal must never be able to hide data.** `Reveal` resolves immediately under reduced
+  motion and force-shows itself after 1600ms if the observer never fires.
+- **`prefers-reduced-motion: reduce` means none, not faster.** Hidden states are reset outright
+  and the parallax stops dead; zeroing durations alone would strand `.reveal` at `opacity: 0`.
 
 ## States
 
@@ -137,4 +166,8 @@ Stated explicitly so they don't reappear:
 gradients of any kind · glassmorphism / backdrop blur · pure `#000` or `#FFF` · `border-radius`
 above 2px · box-shadows · card outlines · nested cards · dark mode toggle · media queries on
 width · icon libraries · emoji as UI · a chart component for a two-div bar · skeleton shimmer ·
-scroll-triggered animation · "Welcome back" copy · congratulating the user on a workout.
+"Welcome back" copy · congratulating the user on a workout.
+
+And on motion specifically: content parallax (only the backdrop moves) · bounce or spring
+easing · anything animating `width`/`height`/`top`/`left` · looping or idle animation · hover
+effects (there is no cursor) · an animation that must finish before a number can be read.

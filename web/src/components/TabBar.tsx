@@ -20,6 +20,8 @@ export function TabBar() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const activeIndex = TABS.findIndex((tab) => tab.href === pathname);
+
   return (
     <nav
       style={{
@@ -34,6 +36,24 @@ export function TabBar() {
         zIndex: 10,
       }}
     >
+      {/* One marker that slides, rather than four that blink on and off. It tracks where you
+          came from, which is the only thing on screen that says these four are one row and not
+          four buttons. Hidden entirely on a route that isn't a tab. */}
+      {activeIndex >= 0 ? (
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: -1,
+            left: 0,
+            width: '25%',
+            height: 2,
+            background: 'var(--signal)',
+            transform: `translateX(${activeIndex * 100}%)`,
+            transition: 'transform 0.34s var(--settle)',
+          }}
+        />
+      ) : null}
       {TABS.map((tab) => {
         const active = pathname === tab.href;
         return (
@@ -59,9 +79,10 @@ export function TabBar() {
               alignItems: 'center',
               justifyContent: 'center',
               color: active ? 'var(--signal)' : 'var(--ink-faint)',
-              // Always 2px, transparent when inactive, so the label never shifts by a pixel as
-              // you move between tabs.
-              borderTop: `2px solid ${active ? 'var(--signal)' : 'transparent'}`,
+              transition: 'color 0.34s var(--settle), opacity 0.12s ease-out',
+              // Matches the sliding marker's 2px so the labels sit on one baseline whether or
+              // not their tab is active.
+              borderTop: '2px solid transparent',
             }}
           >
             {tab.label}

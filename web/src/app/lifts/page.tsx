@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
 import { getPrs, n, type PrRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
+import { Reveal } from '@/components/motion';
 import { agoLabel, clock, daysAgo, dec, int, shortDay } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -40,21 +42,25 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
   return (
     <>
       {weighted.length > 0 ? (
-        <Section label="Loaded" aside={`${weighted.length}`}>
-          {weighted.map((row) => (
-            <Weighted key={row.exercise} row={row} max={maxE1rm} />
-          ))}
-        </Section>
+        <Reveal>
+          <Section label="Loaded" aside={`${weighted.length}`}>
+            {weighted.map((row, i) => (
+              <Weighted key={row.exercise} row={row} max={maxE1rm} index={i} />
+            ))}
+          </Section>
+        </Reveal>
       ) : null}
 
       {weighted.length > 0 && endurance.length > 0 ? <Rule /> : null}
 
       {endurance.length > 0 ? (
-        <Section label="Cardio & timed" aside={`${endurance.length}`}>
-          {endurance.map((row) => (
-            <Endurance key={row.exercise} row={row} />
-          ))}
-        </Section>
+        <Reveal>
+          <Section label="Cardio & timed" aside={`${endurance.length}`}>
+            {endurance.map((row) => (
+              <Endurance key={row.exercise} row={row} />
+            ))}
+          </Section>
+        </Reveal>
       ) : null}
 
       <p style={{ marginTop: 22, color: 'var(--ink-faint)', fontSize: 'var(--t-sm)', lineHeight: 1.5 }}>
@@ -65,7 +71,7 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
   );
 }
 
-function Weighted({ row, max }: { row: PrRow; max: number }) {
+function Weighted({ row, max, index }: { row: PrRow; max: number; index: number }) {
   const e1rm = n(row.best_e1rm_lbs);
   const heaviest = n(row.heaviest_lbs);
   const stale = daysAgo(row.last_performed) > 28;
@@ -84,7 +90,12 @@ function Weighted({ row, max }: { row: PrRow; max: number }) {
       </div>
 
       <div style={{ height: 3, background: 'var(--rule)', margin: '9px 0 8px' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: 'var(--signal)' }} />
+        <div
+          className="draw-x"
+          style={
+            { width: `${pct}%`, height: '100%', background: 'var(--signal)', '--delay': `${index * 45}ms` } as CSSProperties
+          }
+        />
       </div>
 
       {/* Two dates sit on this line and they mean different things — when the best set happened,

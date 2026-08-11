@@ -48,7 +48,11 @@ html {
 
 body {
   margin: 0;
-  background: var(--ground);
+  /* Transparent on purpose. The ground colour lives on <html>, which propagates it to the
+     canvas. If body painted its own background, it would cover the parallax grid: an in-flow
+     block's background paints AFTER negative z-index children in the same stacking context,
+     so the backdrop would be technically present and permanently invisible. */
+  background: transparent;
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: var(--t-base);
@@ -138,11 +142,173 @@ button {
   outline-offset: 2px;
 }
 
+/* --- Motion ----------------------------------------------------------------------------
+ *
+ * Everything here animates transform, opacity, or an SVG dash offset. No animation touches
+ * width, height, top or left, so nothing triggers layout during a scroll — on a phone that is
+ * the difference between 60fps and a stutter you can feel.
+ *
+ * The rule the whole section follows: motion carries a reading. A bar growing to length is
+ * showing you its magnitude; a number settling is an instrument coming online. Nothing moves
+ * merely to prove it can.
+ */
+
+/* Instruments settle: fast out of the gate, long slow arrival. */
+:root {
+  --settle: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A bar drawing to its length. scaleX from a left origin, so it costs no layout. The width
+   itself is already correct in the HTML — this only animates getting there. */
+@keyframes draw-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.draw-x {
+  transform-origin: left center;
+  animation: draw-x 0.75s var(--settle) both;
+  animation-delay: var(--delay, 0s);
+}
+
+/* A sparkline drawing itself on, left to right.
+ *
+ * A clip wipe rather than the usual stroke-dashoffset trick, because the sparkline sets
+ * `vector-effect: non-scaling-stroke` — which makes the browser compute dash lengths in SCREEN
+ * space while `stroke-dasharray` is given in viewBox units. The two disagree by whatever factor
+ * the viewBox is being stretched by, and the line renders as a row of disconnected dashes that
+ * never join up. Clipping is immune to the scaling, and it wipes the fill on at the same time. */
+@keyframes wipe-x {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 -2% 0 0);
+  }
+}
+
+.wipe-x {
+  animation: wipe-x 1.05s var(--settle) both;
+}
+
+/* The area under a sparkline. Animates to 0.12, not to 1 — the end state IS the design. */
+@keyframes fill-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.12;
+  }
+}
+
+.fill-in {
+  opacity: 0.12;
+  animation: fill-in 0.7s ease-out 0.45s both;
+}
+
+/* The marker at the end of a sparkline, arriving after the line reaches it. */
+@keyframes mark-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mark-in {
+  animation: mark-in 0.3s ease-out both;
+  animation-delay: 0.95s;
+}
+
+/* Section entrance. Held hidden until observed, then raised into place.
+   `.seen` is added by the Reveal component; it is also forced on after a timeout so a failed
+   IntersectionObserver can never leave the screen blank. */
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition: opacity 0.5s ease-out, transform 0.6s var(--settle);
+  transition-delay: var(--delay, 0s);
+}
+
+.reveal.seen {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- The nutrition chart -----------------------------------------------------------------
+ *
+ * Recharts' own animation is left off. It re-runs whenever props change, and the scrub handler
+ * changes props on every frame of a drag — the bars would re-grow under your thumb. Animating
+ * the rendered SVG from CSS instead means it plays exactly once, on mount, and the drag stays
+ * perfectly still. */
+@keyframes draw-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.chart-in .recharts-bar-rectangles {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: draw-y 0.7s var(--settle) both;
+}
+
+.chart-in .recharts-line,
+.chart-in .recharts-reference-line {
+  animation: mark-in 0.5s ease-out 0.45s both;
+}
+
+/* The one motion here that responds to you rather than to page load: the bar under your thumb
+   warms as you drag across, instead of snapping. */
+.chart-in .recharts-bar-rectangles rect {
+  transition: fill 0.18s ease-out;
+}
+
+/* The measurement grid behind everything. Fixed, so it does not scroll with the page; the
+   Backdrop component then slides it at a fraction of the scroll rate, which is what gives the
+   data a plane to sit above. */
+.backdrop {
+  position: fixed;
+  inset: -25% 0 -25% 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--rule) 0 1px,
+    transparent 1px 44px
+  );
+  opacity: 0.32;
+  will-change: transform;
+}
+
+/* Reduced motion is not "faster motion" — it is none.
+ *
+ * Zeroing durations globally would leave `.reveal` mid-transition and invisible, so the hidden
+ * states are explicitly reset rather than rushed, and the parallax layer stops dead. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .backdrop {
+    transform: none !important;
   }
 }

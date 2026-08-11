@@ -1,5 +1,6 @@
 import { getBodyweight, getMuscles, getNutrition, getReview, n, n0 } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Row, Swatch } from '@/components/ui';
+import { Reveal } from '@/components/motion';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek } from '@/lib/format';
 import Link from 'next/link';
 
@@ -27,14 +28,23 @@ export default async function Today() {
     <main className="screen">
       <Masthead left={dayLabel(toIso(now))} right={`WK ${isoWeek(now)}`} />
 
-      <Bodyweight result={weight} />
+      {/* Sections are raised into place as they come into view, each a beat after the last.
+          The delays are small on purpose — this is a screen you check for five seconds, so the
+          whole page has to be settled before you have finished looking at the first number. */}
+      <Reveal>
+        <Bodyweight result={weight} />
+      </Reveal>
       <Rule />
-      <Fuel result={nutrition} />
+      <Reveal delay={60}>
+        <Fuel result={nutrition} />
+      </Reveal>
       <Rule />
-      <Volume result={muscles} />
+      <Reveal delay={120}>
+        <Volume result={muscles} />
+      </Reveal>
 
       {review.ok && review.rows.length > 0 ? (
-        <>
+        <Reveal delay={180}>
           <Rule />
           <Link href="/food" className="pressable" style={{ display: 'block' }}>
             <Row
@@ -44,7 +54,7 @@ export default async function Today() {
               style={{ borderTop: 'none' }}
             />
           </Link>
-        </>
+        </Reveal>
       ) : null}
     </main>
   );
@@ -86,7 +96,7 @@ function Bodyweight({ result }: { result: Awaited<ReturnType<typeof getBodyweigh
   return (
     <Section label="Bodyweight" aside={agoLabel(latest.date)}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-        <Figure value={dec(current)} unit="LB" size="var(--t-3xl)" />
+        <Figure value={dec(current)} unit="LB" size="var(--t-3xl)" count={current} decimals={1} />
         <Delta value={change} unit="lb" over="30d" />
       </div>
 
@@ -140,7 +150,7 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
 
   return (
     <Section label="Fuel" aside={`${row.items} item${row.items === 1 ? '' : 's'}`}>
-      <Figure value={int(n(row.calories))} unit="KCAL" />
+      <Figure value={int(n(row.calories))} unit="KCAL" count={n(row.calories)} />
 
       {total > 0 ? (
         <div style={{ display: 'flex', height: 8, marginTop: 16, gap: 2 }}>
@@ -197,9 +207,10 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getMuscles>> }) 
 
   return (
     <Section label="Volume" aside="28d">
-      {rows.map((row) => (
+      {rows.map((row, i) => (
         <BarRow
           key={row.region}
+          index={i}
           label={row.region}
           value={n0(row.primary_volume_lbs)}
           secondary={n0(row.secondary_volume_lbs)}
