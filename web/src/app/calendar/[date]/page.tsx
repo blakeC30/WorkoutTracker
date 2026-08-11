@@ -176,18 +176,6 @@ function Exercise({ workout }: { workout: DayWorkout }) {
   const distance = workout.sets.reduce((sum, set) => sum + n0(set.distance_mi), 0);
   const duration = workout.sets.reduce((sum, set) => sum + n0(set.duration_min), 0);
 
-  // ONE set gets marked, not every set tying for the heaviest. Three sets across at 260 would
-  // otherwise all light up, which says nothing — the mark is meant to find the best set at a
-  // glance. Ties on weight are broken by reps, so 260x8 beats 260x5.
-  const topIndex = workout.sets.reduce((best, set, i, all) => {
-    const weight = n0(set.weight_lbs);
-    const bestWeight = n0(all[best].weight_lbs);
-    if (weight > bestWeight) return i;
-    if (weight === bestWeight && (set.reps ?? 0) > (all[best].reps ?? 0)) return i;
-    return best;
-  }, 0);
-  const hasLoad = workout.sets.some((set) => n0(set.weight_lbs) > 0);
-
   // Cardio and timed holds have no volume; falling back to the category would label a plank
   // "strength", which is true and useless. Report what was actually measured.
   const summary =
@@ -217,8 +205,8 @@ function Exercise({ workout }: { workout: DayWorkout }) {
           flattening 135x8, 155x5, 175x3 to an average would destroy both the top set and the
           total, and this is the screen where you go to see exactly what happened. */}
       <div style={{ marginTop: 8 }}>
-        {workout.sets.map((set, i) => (
-          <SetLine key={set.set_number} set={set} isTop={hasLoad && i === topIndex} />
+        {workout.sets.map((set) => (
+          <SetLine key={set.set_number} set={set} />
         ))}
       </div>
 
@@ -229,7 +217,7 @@ function Exercise({ workout }: { workout: DayWorkout }) {
   );
 }
 
-function SetLine({ set, isTop }: { set: DayWorkout['sets'][number]; isTop: boolean }) {
+function SetLine({ set }: { set: DayWorkout['sets'][number] }) {
   const weight = n(set.weight_lbs);
   const distance = n(set.distance_mi);
   const duration = n(set.duration_min);
@@ -248,7 +236,7 @@ function SetLine({ set, isTop }: { set: DayWorkout['sets'][number]; isTop: boole
     >
       <span style={{ color: 'var(--ink-faint)', width: 16, fontSize: 'var(--t-cap)' }}>{set.set_number}</span>
 
-      <span style={{ color: isTop ? 'var(--signal)' : 'var(--ink)' }}>
+      <span style={{ color: 'var(--ink)' }}>
         {weight !== null && set.reps !== null
           ? `${dec(weight, 0)} × ${set.reps}`
           : distance !== null
