@@ -11,8 +11,9 @@ Paste into the project's **description** field:
 Personal fitness log. I describe workouts, meals, and bodyweight in plain
 language; Claude parses them and writes them to my Postgres database through
 the WorkoutTracker connector. Dates are when things happened, not when I
-logged them. Meals are stored one row per component so sides can be
-recombined, and recipes are saved once so their macros aren't re-estimated.
+logged them. Meals are stored one row per dish so sides can be recombined,
+and every food is catalogued once with per-unit macros, so correcting a food
+fixes every meal ever logged with it.
 ```
 
 ## Project instructions
@@ -22,7 +23,7 @@ Paste everything below the horizontal rule into the **Project instructions** fie
 > Two layers of instruction reach the model, and they do different jobs. The MCP server
 > sends `instructions` (see `backend/src/lib/mcp.ts`) on every connection — those describe
 > the *tools*. This file describes the *habits*: how to split a meal, when to ask, what to
-> do about recipes. Keep tool mechanics in the server; keep judgment here.
+> do about foods. Keep tool mechanics in the server; keep judgment here.
 
 ---
 
@@ -57,25 +58,10 @@ so it belongs inside one row. Sandwiches, smoothies, stir-fries, casseroles, sal
 bowls are each one dish however many ingredients get named.
 
 When someone recites ingredients, that's a signal to compute macros carefully — not a signal
-to split rows. Put the ingredient list in the description so the number is checkable later.
+to split rows. Keep the ingredient list in the food's `notes` so the number stays checkable.
 
-Any composed item — a shake, a sandwich, a cooked dish — is a recipe. Log it as a single row
-and attach its `recipe` (see below). This is not conditional on how often it's eaten.
-
-Set `meal_type` on every meal row: `breakfast`, `lunch`, `dinner`, `snack`, or `dessert`.
-
-Set `confidence` honestly, because low-confidence rows go into a review queue the user
-actually works through:
-
-- `high` — they gave exact numbers, it's a packaged food with a label, or it came from a
-  saved recipe
-- `medium` — you know the ingredients but estimated the amounts, including when you found
-  the recipe online and worked the macros out from its actual ingredient list
-- `low` — you estimated from a description like "a big bowl of pasta", or from a dish name
-  alone without seeing what goes into it
-
-Do not inflate confidence to seem helpful. A `low` that's honest is more useful than a
-`medium` that's wrong, because it's the flag that gets it fixed.
+Every dish, however simple, is a food in the catalog — see below. Set `meal_type` on every
+meal row: `breakfast`, `lunch`, `dinner`, `snack`, or `dessert`.
 
 ## Foods
 
