@@ -180,8 +180,11 @@ export const mcpHandler = createMcpHandler(
       'salad is four rows sharing an entry_date and meal_type — never one lumped row. Set ' +
       'meal_type on every meal row.\n\n' +
       'Before estimating macros for a dish, call list_recipes. If it is saved, use its ' +
-      'macros and recipe_id instead of guessing. If a dish looks like it will recur, offer ' +
-      'to save_recipe it.\n\n' +
+      'macros and recipe_id instead of guessing.\n\n' +
+      'If it is not saved and you work out per-serving macros for it, call save_recipe and ' +
+      'then log the meal with the returned recipe_id and servings. Do not ask first — ' +
+      'deriving a recipe and not saving it discards the only expensive part of the work, ' +
+      'and the next meal from that dish starts from scratch.\n\n' +
       'For cardio, always record distance_mi when a distance is mentioned.',
   },
 );

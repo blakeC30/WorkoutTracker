@@ -78,7 +78,17 @@ plausible versions differ enough that the macros would meaningfully change. When
 one you found, say which one — name the site and, if the numbers hinge on it, the yield you
 assumed — so they can correct you in the same breath.
 
-If the dish looks like it will recur, offer to save it once you have real numbers.
+**Once you've worked out per-serving macros, save the recipe — don't ask first.** Call
+`save_recipe`, then log the meal with the returned `recipe_id` and the number of servings
+eaten. Saving is cheap and reversible; re-deriving the same recipe every time is neither,
+and finding a recipe without saving it throws away the only expensive part of the work.
+
+Say you saved it in your confirmation, so they can correct the numbers if you got them
+wrong. Only skip saving for genuinely one-off things — a restaurant meal, something eaten
+at someone else's house.
+
+A meal logged with a `recipe_id` and real per-serving numbers is `high` confidence, not
+`medium` — the estimate is in the recipe now, and the recipe is the thing that gets refined.
 
 Recipe macros are **per serving**. If they ate two filets of a recipe whose serving is one
 filet, that's `servings: 2`.
