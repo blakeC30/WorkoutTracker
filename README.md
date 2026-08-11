@@ -81,7 +81,13 @@ every exercise, every dish with its portion, and the raw journal text it was par
 the only screen that shows individual sets or journal text; everywhere else is a rollup.
 
 `exercises.pattern` is what all of that groups by, and it deliberately lives on the exercise
-rather than on the muscle: **the pattern is a property of the movement**. A bench press is a
+rather than on the muscle: **the pattern is a property of the movement**.
+
+Five patterns own a colour and a calendar slot; anything else — sports, mobility — falls into
+`other`, shown as "Sport & other" in neutral ink. It appears as a ROW wherever there is one
+(Today's volume, last-trained, the coverage matrix) but gets no square slot, since the squares
+are legible at 6px only because five positions never change. `PATTERNS` and `PATTERN_ROWS` in
+`web/src/lib/patterns.ts` are that distinction. A bench press is a
 push even though triceps do real work; a curl is a pull even though it is the same arm.
 Deriving it from muscles puts both in "arms" and gets both wrong.
 

@@ -16,9 +16,38 @@ export const PATTERNS = [
   { key: 'cardio', label: 'Cardio', color: 'var(--cardio)' },
 ] as const;
 
+/**
+ * The catch-all: sports, mobility, anything that doesn't press, pull, squat, brace or condition.
+ *
+ * Neutral ink rather than a sixth hue, and no calendar slot. The palette encodes the five
+ * patterns a session is planned around; this bucket is "none of those", and giving it a colour
+ * would imply it belongs to the same series.
+ *
+ * Two labels because the contexts differ. `label` is used where a line of text has room and the
+ * word "sport" is worth saying — an occasional match should read as something you did, not as a
+ * leftover category. `short` is for the 54px columns, where nothing longer than six characters
+ * fits at this type size.
+ */
+export const OTHER_PATTERN = {
+  key: 'other',
+  label: 'Sport & other',
+  short: 'Other',
+  color: 'var(--ink-dim)',
+} as const;
+
+/**
+ * Everything that can appear as a ROW in a list, as opposed to a slot in a calendar square.
+ *
+ * The distinction is the point: the square has five fixed positions and its legibility depends
+ * on that staying true, but a list can grow. Sports used to be dropped from Today's volume, the
+ * coverage matrix and last-trained entirely, because those all iterated the five — 75 minutes of
+ * basketball reported as nothing at all.
+ */
+export const PATTERN_ROWS = [...PATTERNS, OTHER_PATTERN] as const;
+
 export type PatternKey = (typeof PATTERNS)[number]['key'];
 
-const BY_KEY = new Map(PATTERNS.map((p) => [p.key, p]));
+const BY_KEY = new Map(PATTERN_ROWS.map((p) => [p.key, p]));
 
 /**
  * An exercise with no pattern, or one stored as 'other', falls back to plain ink rather than
@@ -26,9 +55,12 @@ const BY_KEY = new Map(PATTERNS.map((p) => [p.key, p]));
  * exercise, and the whole point of the palette is that a colour means one thing.
  */
 export function patternColor(key: string | null | undefined): string {
-  return BY_KEY.get((key ?? '') as PatternKey)?.color ?? 'var(--ink-dim)';
+  return BY_KEY.get((key ?? '') as PatternKey)?.color ?? OTHER_PATTERN.color;
 }
 
+/** The compact form. Used on row chips and in narrow label columns, where six characters fit. */
 export function patternLabel(key: string | null | undefined): string {
-  return BY_KEY.get((key ?? '') as PatternKey)?.label ?? 'Other';
+  const found = BY_KEY.get((key ?? '') as PatternKey);
+  if (!found) return OTHER_PATTERN.short;
+  return 'short' in found ? found.short : found.label;
 }

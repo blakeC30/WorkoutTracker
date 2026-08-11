@@ -153,7 +153,10 @@ export async function getPatternRecency() {
 
   return sql`
     with patterns(pattern) as (
-      values ('push'), ('pull'), ('legs'), ('core'), ('cardio')
+      -- 'other' is listed so sports and anything else unclassified appear here rather than
+      -- vanishing. A pattern you last trained a fortnight ago is exactly what this strip is
+      -- for, and omitting the bucket meant an occasional match was never reported at all.
+      values ('push'), ('pull'), ('legs'), ('core'), ('cardio'), ('other')
     ),
     last_done as (
       select e.pattern, max(w.entry_date) as last_date

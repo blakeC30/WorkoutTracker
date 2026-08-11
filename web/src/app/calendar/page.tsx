@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { getCalendar, getMonths, n, n0, type CalendarRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
-import { PATTERNS } from '@/lib/patterns';
+import { PATTERNS, PATTERN_ROWS, patternLabel } from '@/lib/patterns';
 import { Consistency } from '@/components/Consistency';
 import { dec, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
 
@@ -321,7 +321,9 @@ function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
   return (
     <Section label="Coverage" aside="by pattern">
       <div>
-        {PATTERNS.map((pattern, rowIndex) => {
+        {/* Rows, not slots: the catch-all gets a line here even though it has no square slot,
+            so a month of Sunday-league football is not a blank in the coverage view. */}
+        {PATTERN_ROWS.map((pattern, rowIndex) => {
           const hits = days.filter((date) => byDate.get(date)?.has(pattern.key)).length;
           return (
             <div
@@ -329,7 +331,7 @@ function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
               style={{ display: 'grid', gridTemplateColumns: '54px 1fr 26px', alignItems: 'center', gap: 8, height: 20 }}
             >
               <span className="cap" style={{ color: hits ? pattern.color : 'var(--ink-faint)' }}>
-                {pattern.label}
+                {patternLabel(pattern.key)}
               </span>
               <span style={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 {days.map((date, i) => {

@@ -1,7 +1,7 @@
 import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type FoodRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
-import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
+import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
 import Link from 'next/link';
 
@@ -299,7 +299,10 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPatte
   }
 
   const byPattern = new Map(result.rows.map((r) => [r.pattern, r]));
-  const trained = PATTERNS.map((p) => ({ pattern: p, row: byPattern.get(p.key) })).filter(
+  // PATTERN_ROWS, not PATTERNS: the five have calendar slots, but a list can carry the
+  // catch-all too. Iterating the five dropped sports entirely — 75 minutes of basketball
+  // reported as nothing at all.
+  const trained = PATTERN_ROWS.map((p) => ({ pattern: p, row: byPattern.get(p.key) })).filter(
     (entry) => entry.row !== undefined,
   );
 
