@@ -114,20 +114,25 @@ const WEEKLY_GAIN = {
 
 
 /**
- * Sentence case at insert time, keys stay lowercase.
+ * Title Case at insert time, keys stay lower case.
  *
  * The literals above double as lookup keys for SESSIONS, START and WEEKLY_GAIN, so renaming
  * them would mean keeping four lists in sync and would break silently if one drifted. The
- * database gets the capitalised form; the script keeps working in lowercase.
+ * database gets the display form; the script keeps working in lower case.
  *
- * Sentence case, not Title Case — "Barbell back squat", not "Barbell Back Squat". Proper nouns
- * that fall mid-name are listed explicitly, because no mechanical rule finds them.
+ * Title Case, the way a program sheet writes an exercise: "Barbell Back Squat". Short joining
+ * words stay lower case unless they lead, which is the difference between title case and
+ * capitalising every word — "Oatmeal with Berries", not "Oatmeal With Berries".
  */
-const NAME_OVERRIDES = {
-  'turkey and swiss sandwich': 'Turkey and Swiss sandwich',
-};
+const SMALL_WORDS = new Set(['and', 'with', 'of', 'the', 'on', 'in', 'a', 'to', 'or']);
 
-const displayName = (name) => NAME_OVERRIDES[name] ?? name.charAt(0).toUpperCase() + name.slice(1);
+const displayName = (name) =>
+  name
+    .split(' ')
+    .map((word, i) =>
+      i > 0 && SMALL_WORDS.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(' ');
 
 const pool = new Pool({ connectionString });
 

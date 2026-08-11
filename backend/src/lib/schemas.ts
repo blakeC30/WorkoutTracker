@@ -53,10 +53,11 @@ export const inlineExercise = z.object({
     .string()
     .min(1)
     .describe(
-      'Canonical name for the movement, e.g. "Back squat", "Treadmill run". Not "3x5 back ' +
-        'squat". Write it the way it is normally written: first letter capitalised, the rest ' +
-        'lower case, but keep acronyms and proper nouns as they are — "RDL", "EZ bar curl", ' +
-        '"Bulgarian split squat". Names are stored exactly as given and shown that way.',
+      'Canonical name for the movement, e.g. "Back Squat", "Treadmill Run". Not "3x5 back ' +
+        'squat". Title Case, the way a program sheet writes it: capitalise each word, but ' +
+        'leave short joining words lower case unless they lead — "Good Morning", "Farmer ' +
+        'Carry", "Pull-up with Band". Keep acronyms as they are: "RDL", "EZ Bar Curl". Names ' +
+        'are stored exactly as given and shown that way, so a dropped capital stays dropped.',
     ),
   aliases: z
     .array(z.string())
@@ -139,10 +140,11 @@ export const inlineFood = z.object({
     .string()
     .min(1)
     .describe(
-      'Short catalog name for the food itself, e.g. "Nobu miso black cod", "Green beans". ' +
-        'Not a description of this particular serving — no "(side)", no "2 filets". First ' +
-        'letter capitalised, rest lower case, but keep proper nouns as they are — "Greek ' +
-        'yogurt", "Turkey and Swiss sandwich". Stored and shown exactly as given.',
+      'Short catalog name for the food itself, e.g. "Nobu Miso Black Cod", "Green Beans". ' +
+        'Not a description of this particular serving — no "(side)", no "2 filets". Title ' +
+        'Case, the way a menu writes it, with short joining words left lower case unless they ' +
+        'lead — "Oatmeal with Berries", "Turkey and Swiss Sandwich". Stored and shown exactly ' +
+        'as given.',
     ),
   unit_label: z
     .string()

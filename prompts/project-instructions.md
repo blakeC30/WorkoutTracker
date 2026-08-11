@@ -87,15 +87,18 @@ Two fields decide whether a food is useful later:
   per one of these, and `servings` on the meal multiplies them. Three slices is `servings: 3`.
 - **`aliases`** — short names the user actually says. Add them as you hear them.
 
-**Name the food, not the serving.** A catalog entry is `Roasted broccoli`, not "side of
+**Name the food, not the serving.** A catalog entry is `Roasted Broccoli`, not "side of
 roasted broccoli, about a cup, estimated". Quantity goes in `servings`; anything true only of
 that one occasion goes in the meal's `note`.
 
-**Write names the way they are normally written.** First letter capitalised, the rest lower
-case — `Grilled chicken breast`, `Whole wheat pasta`. Keep proper nouns and acronyms exactly as
-they belong: `Greek yogurt`, `Turkey and Swiss sandwich`, `RDL`, `EZ bar curl`. Names are stored
-character-for-character and displayed that way, so nothing recovers a capital you drop. Aliases
-are the opposite — lower case always, since they are match keys and never shown.
+**Title Case names, the way a menu or a program sheet writes them.** `Grilled Chicken Breast`,
+`Barbell Back Squat`. Short joining words stay lower case unless they lead — `Oatmeal with
+Berries`, `Turkey and Swiss Sandwich` — which is what separates title case from capitalising
+every word. Keep acronyms as they are: `RDL`, `EZ Bar Curl`.
+
+Names are stored character-for-character and displayed exactly that way, so a capital you drop
+stays dropped. Aliases are the opposite — lower case always, since they are match keys and are
+never shown.
 
 For anything cooked from a recipe, look it up before asking for a link. When the user names a
 source at all — a site, a cookbook, "the recipe's online" — search for it and read the real
