@@ -5,7 +5,7 @@ import type { FoodRow } from '@/lib/backend';
 import { FoodEditor } from '@/components/FoodEditor';
 import { searchFoods } from '@/app/food/actions';
 import { ListControls, matches, type SortOption } from '@/components/ListControls';
-import { Section, Empty } from '@/components/ui';
+import { Section, Empty, Macros } from '@/components/ui';
 import { n } from '@/lib/num';
 import { agoLabel, int, parseDay } from '@/lib/format';
 
@@ -154,11 +154,11 @@ function Item({ row }: { row: FoodRow }) {
           className="mono"
           style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 'var(--t-cap)', color: 'var(--ink-faint)' }}
         >
-          <span>
-            ×{row.times_eaten}
-            {row.calories !== null
-              ? ` · ${int(n(row.protein_g))} P ${int(n(row.carbs_g))} C ${int(n(row.fat_g))} F`
-              : ''}
+          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 12 }}>
+            <span>×{row.times_eaten}</span>
+            {row.calories !== null ? (
+              <Macros protein={n(row.protein_g)} carbs={n(row.carbs_g)} fat={n(row.fat_g)} />
+            ) : null}
           </span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
             {estimated ? (

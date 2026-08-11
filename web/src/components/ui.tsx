@@ -304,6 +304,44 @@ export function Fault({ error }: { error: string }) {
 }
 
 /**
+ * Protein / carbs / fat on one line.
+ *
+ * The pairs used to be three spans in a flex row with a plain space inside each — "54 P 0 C 6 F"
+ * — which put roughly the same gap inside a pair as between pairs, so the eye had nothing to
+ * group on and it read as one run of alternating characters. Two changes fix it: the unit sits
+ * hard against its number, and the gap between pairs is widened well past a space. The number is
+ * also a step brighter than its unit, so the value leads and the letter annotates it.
+ */
+export function Macros({
+  protein,
+  carbs,
+  fat,
+  size = 'var(--t-cap)',
+}: {
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  size?: string;
+}) {
+  return (
+    <span className="mono" style={{ display: 'inline-flex', gap: 14, fontSize: size }}>
+      <MacroPair value={protein} unit="P" />
+      <MacroPair value={carbs} unit="C" />
+      <MacroPair value={fat} unit="F" />
+    </span>
+  );
+}
+
+function MacroPair({ value, unit }: { value: number | null; unit: string }) {
+  return (
+    <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-dim)' }}>
+      {value === null ? '—' : Math.round(value).toLocaleString('en-US')}
+      <span style={{ color: 'var(--ink-faint)' }}>{unit}</span>
+    </span>
+  );
+}
+
+/**
  * A legend swatch. A drawn box rather than a `■` glyph, whose size and baseline shift with
  * whatever font happens to have it.
  */

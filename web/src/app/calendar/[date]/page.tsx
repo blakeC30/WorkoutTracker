@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDay, n, n0, type DayDetail, type DayJournal, type DayMeal, type DayWorkout } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Empty, Fault } from '@/components/ui';
+import { Masthead, Section, Rule, Figure, Empty, Fault, Macros } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
 import { addDays, agoLabel, clock, dayLabel, dec, int, monthKey, monthShape, shortDay, today } from '@/lib/format';
@@ -308,8 +308,8 @@ function Food({ meals }: { meals: DayMeal[] }) {
   return (
     <Section label="Food" aside={`${meals.length} dishes`}>
       <Figure value={int(totals.calories)} unit="KCAL" count={totals.calories} />
-      <div className="mono" style={{ marginTop: 10, fontSize: 'var(--t-sm)', color: 'var(--ink-dim)' }}>
-        {int(totals.protein)} P · {int(totals.carbs)} C · {int(totals.fat)} F
+      <div style={{ marginTop: 10 }}>
+        <Macros protein={totals.protein} carbs={totals.carbs} fat={totals.fat} size="var(--t-sm)" />
       </div>
 
       <div style={{ marginTop: 18 }}>
@@ -367,13 +367,8 @@ function Dish({ meal }: { meal: DayMeal }) {
           page dedicated to showing a day as recorded that summarised instead.
           Already multiplied by servings, so these are what the dish actually contributed. */}
       {meal.calories !== null ? (
-        <div
-          className="mono"
-          style={{ display: 'flex', gap: 10, marginTop: 3, fontSize: 'var(--t-cap)', color: 'var(--ink-faint)' }}
-        >
-          <span>{int(t.protein)} P</span>
-          <span>{int(t.carbs)} C</span>
-          <span>{int(t.fat)} F</span>
+        <div style={{ marginTop: 3 }}>
+          <Macros protein={t.protein} carbs={t.carbs} fat={t.fat} />
         </div>
       ) : null}
 
