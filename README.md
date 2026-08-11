@@ -41,8 +41,24 @@ cd ../web && npm install && cp .env.example .env.local
 
 ## The dashboard
 
-Four screens — **Today**, **Week**, **Lifts**, **Food** — built for one device: an iPhone 13
-Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on purpose.
+Five screens — **Today**, **Week**, **Days**, **Lifts**, **Food** — built for one device: an
+iPhone 13 Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on
+purpose.
+
+**Days** is the calendar: a month grid where each square carries two bars (training volume in
+amber, calories dimmer), tapping through to `/calendar/<date>` for the complete record of that
+day — every set of every exercise, every dish with its portion, and the raw journal text it was
+all parsed from. It is the only screen that shows individual sets or journal text; everywhere
+else is a rollup.
+
+Two notes on that screen, both consequences of schema rules:
+
+- **Journals are found by what they produced**, never by their own `created_at`. "Yesterday I
+  squatted" writes a workout dated yesterday from a journal stamped today, so the day page
+  labels an entry `written 11 Aug` when the two dates disagree.
+- **Food macros are per unit**, and `servings` multiplies them. A 6 oz chicken breast is stored
+  as `calories: 47, servings: 6`. Rendering `calories` alone under-reports a day by the portion
+  size.
 
 `npm run dev` in `web/` serves it on :3001. It needs the backend running on :3000, since every
 screen fetches from the REST API.

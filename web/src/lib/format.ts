@@ -74,6 +74,63 @@ export function daysAgo(iso: string): number {
   return Math.round((today.getTime() - then.getTime()) / 86_400_000);
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** 'YYYY-MM-DD' for a local Date. `toISOString()` would give UTC and shift the day. */
+export function toIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Today, in the phone's own timezone. */
+export function today(): string {
+  return toIso(new Date());
+}
+
+/** Shifts a 'YYYY-MM-DD' by whole days, staying in local time. */
+export function addDays(iso: string, delta: number): string {
+  const d = parseDay(iso);
+  d.setDate(d.getDate() + delta);
+  return toIso(d);
+}
+
+/**
+ * A month, as the pieces a grid needs.
+ *
+ * Weeks start on **Monday**, matching the rest of the app: Postgres `date_trunc('week')` is
+ * Monday-based and the Week screen counts ISO weeks, so a Sunday-first calendar here would put
+ * a different boundary on the same data two taps apart.
+ */
+export function monthShape(key: string) {
+  const [year, month] = key.split('-').map(Number);
+  const first = new Date(year, month - 1, 1);
+  const days = new Date(year, month, 0).getDate();
+  return {
+    year,
+    month,
+    label: `${MONTH_NAMES[month - 1]} ${year}`,
+    short: `${MONTH_NAMES[month - 1].slice(0, 3).toUpperCase()}`,
+    days,
+    /** Blank squares before the 1st. getDay() is Sunday-based, so Monday has to become 0. */
+    leading: (first.getDay() + 6) % 7,
+    from: `${key}-01`,
+    to: `${key}-${String(days).padStart(2, '0')}`,
+  };
+}
+
+/** 'YYYY-MM' for a date string, and neighbouring months for the pager. */
+export function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+export function shiftMonth(key: string, delta: number): string {
+  const [year, month] = key.split('-').map(Number);
+  const d = new Date(year, month - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function agoLabel(iso: string): string {
   const days = daysAgo(iso);
   if (days <= 0) return 'TODAY';

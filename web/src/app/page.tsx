@@ -1,7 +1,7 @@
 import { getBodyweight, getMuscles, getNutrition, getReview, n, n0 } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Row, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
-import { agoLabel, compact, dayLabel, dec, int, isoWeek } from '@/lib/format';
+import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -234,11 +234,6 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getMuscles>> }) 
 }
 
 // --- Helpers ----------------------------------------------------------------------------
-
-/** Today in the phone's own timezone, as 'YYYY-MM-DD'. `toISOString()` would give UTC. */
-function toIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function daysBetween(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number);

@@ -19,6 +19,9 @@ const API_SECRET = process.env.API_SECRET;
  */
 export type Result<T> = { ok: true; rows: T[] } | { ok: false; error: string };
 
+/** Same contract for endpoints that return one object rather than a list of rows. */
+export type One<T> = { ok: true; row: T } | { ok: false; error: string };
+
 async function query<T>(path: string, params: Record<string, string | number> = {}): Promise<Result<T>> {
   if (!BACKEND_URL || !API_SECRET) {
     return { ok: false, error: 'BACKEND_URL and API_SECRET are not set in web/.env.local' };
@@ -53,13 +56,26 @@ async function query<T>(path: string, params: Record<string, string | number> = 
   }
 }
 
+/** The object-returning counterpart to `query`. Shares its error handling by delegating. */
+async function queryOne<T>(path: string, params: Record<string, string | number> = {}): Promise<One<T>> {
+  const result = await query<T>(path, params);
+  if (!result.ok) return result;
+  // `query` reads `data ?? []`; an object endpoint puts its object in that same slot, so the
+  // array wrapper here is an artefact of sharing the transport, not of the response shape.
+  const row = result.rows as unknown as T;
+  return row ? { ok: true, row } : { ok: false, error: 'Empty response' };
+}
+
 /**
  * Postgres `numeric` arrives over the wire as a STRING — `sum()`, `avg()` and `round()` all
  * return numeric, so `volume_lbs` is "83265" and not 83265. Columns cast `::int` come back as
  * real numbers. Rather than remember which is which at every call site, every numeric field is
  * typed `Num` and read through `n()`.
  */
-export type Num = string | number | null;
+// `undefined` is included because a calendar square looks up a day that may not be in the
+// response at all — an absent day and a null column both mean "no reading", and forcing the
+// call site to distinguish them would only produce `?? null` noise.
+export type Num = string | number | null | undefined;
 
 export function n(value: Num): number | null {
   if (value === null || value === undefined) return null;
@@ -148,6 +164,81 @@ export type ReviewRow = {
   total_calories: Num;
   last_eaten: string;
 };
+
+/** One row per day that has anything on it. Days with nothing recorded are simply absent. */
+export type CalendarRow = {
+  date: string;
+  exercises: number;
+  sets: number;
+  volume_lbs: Num;
+  cardio_mi: Num;
+  cardio_min: Num;
+  items: number;
+  calories: Num;
+  protein_g: Num;
+  weight_lbs: Num;
+};
+
+export type DaySet = {
+  set_number: number;
+  reps: number | null;
+  weight_lbs: Num;
+  duration_min: Num;
+  distance_mi: Num;
+  rpe: Num;
+  notes: string | null;
+};
+
+export type DayWorkout = {
+  exercise: string;
+  category: string | null;
+  equipment: string | null;
+  notes: string | null;
+  sets: DaySet[];
+};
+
+/**
+ * Macros here are PER UNIT, exactly as they sit on the food — `servings` multiplies them.
+ * A 6 oz chicken breast arrives as calories: 47, servings: 6. Rendering `calories` on its own
+ * would under-report the day by a factor of the portion size.
+ */
+export type DayMeal = {
+  id: number;
+  meal_type: string | null;
+  type_order: number;
+  servings: Num;
+  note: string | null;
+  name: string;
+  unit_label: string | null;
+  confidence: 'low' | 'medium' | 'high' | null;
+  source_url: string | null;
+  calories: Num;
+  protein_g: Num;
+  carbs_g: Num;
+  fat_g: Num;
+};
+
+/** `logged_on` is the journal's own date and is NOT the day it describes. */
+export type DayJournal = {
+  id: number;
+  raw_text: string;
+  source: string;
+  logged_at: string;
+  logged_on: string;
+};
+
+export type DayDetail = {
+  date: string;
+  bodyweight: { weight_lbs: Num; notes: string | null } | null;
+  workouts: DayWorkout[];
+  meals: DayMeal[];
+  journals: DayJournal[];
+};
+
+export const getCalendar = (from: string, to: string) =>
+  query<CalendarRow>('/api/stats/calendar', { from, to });
+
+export const getDay = (date: string) => queryOne<DayDetail>('/api/stats/day', { date });
 
 export const getBodyweight = (days = 90) => query<BodyweightRow>('/api/stats/bodyweight', { days });
 export const getMuscles = (days = 28) => query<MuscleRow>('/api/stats/muscles', { days });

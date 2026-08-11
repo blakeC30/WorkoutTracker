@@ -12,6 +12,9 @@ import { usePathname, useRouter } from 'next/navigation';
 const TABS = [
   { href: '/', label: 'Today' },
   { href: '/week', label: 'Week' },
+  // "Days" rather than "Calendar": at 11px with the tracking these labels carry, the longer
+  // word leaves 6px of breathing room in a 78px tab. The screen itself is headed by its month.
+  { href: '/calendar', label: 'Days' },
   { href: '/lifts', label: 'Lifts' },
   { href: '/food', label: 'Food' },
 ] as const;
@@ -20,7 +23,10 @@ export function TabBar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const activeIndex = TABS.findIndex((tab) => tab.href === pathname);
+  // A day detail lives under /calendar/<date>, so the tab stays lit while you are down there.
+  const activeIndex = TABS.findIndex(
+    (tab) => pathname === tab.href || (tab.href !== '/' && pathname.startsWith(`${tab.href}/`)),
+  );
 
   return (
     <nav
@@ -29,7 +35,7 @@ export function TabBar() {
         insetInline: 0,
         bottom: 0,
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: `repeat(${TABS.length}, 1fr)`,
         background: 'var(--ground)',
         borderTop: '1px solid var(--rule)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -46,7 +52,7 @@ export function TabBar() {
             position: 'absolute',
             top: -1,
             left: 0,
-            width: '25%',
+            width: `${100 / TABS.length}%`,
             height: 2,
             background: 'var(--signal)',
             transform: `translateX(${activeIndex * 100}%)`,
