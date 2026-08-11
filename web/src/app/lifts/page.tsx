@@ -41,7 +41,11 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
   // The scale for the e1RM bars. Squats dwarf curls, so this is a rough sense of where the
   // heavy work sits, not a claim that the exercises are comparable.
   const maxE1rm = Math.max(...weighted.map((r) => n(r.best_e1rm_lbs) ?? 0), 1);
+  // Two scales, because Bodyweight now holds two units: push-ups measured in reps and planks
+  // measured in minutes. Each row is drawn against the best of its OWN unit — one shared scale
+  // would put a 20-rep set and a 1-minute hold on the same axis, which means nothing.
   const maxReps = Math.max(...bodyweight.map((r) => r.best_reps ?? 0), 1);
+  const maxHold = Math.max(...bodyweight.map((r) => n(r.best_duration_min) ?? 0), 1);
 
   return (
     <>
@@ -57,14 +61,14 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
 
       {weighted.length > 0 && bodyweight.length > 0 ? <Rule /> : null}
 
-      {/* Push-ups, sit-ups, pull-ups. Their own section because their record is reps at no
-          load, which is neither a tonnage PR nor a distance — before this they fell through to
-          "Cardio & timed" and rendered as an em-dash. */}
+      {/* Push-ups, sit-ups, pull-ups, planks — anything unloaded that isn't cardio. Grouped by
+          kind rather than by unit, so a hold sits with the calisthenics it belongs to instead of
+          beside the rowing machine just because both are measured in minutes. */}
       {bodyweight.length > 0 ? (
         <Reveal>
           <Section label="Bodyweight" aside={`${bodyweight.length}`}>
             {bodyweight.map((row, i) => (
-              <Calisthenic key={row.exercise} row={row} max={maxReps} index={i} />
+              <Calisthenic key={row.exercise} row={row} maxReps={maxReps} maxHold={maxHold} index={i} />
             ))}
           </Section>
         </Reveal>
@@ -74,7 +78,7 @@ function Body({ result }: { result: Awaited<ReturnType<typeof getPrs>> }) {
 
       {endurance.length > 0 ? (
         <Reveal>
-          <Section label="Cardio & timed" aside={`${endurance.length}`}>
+          <Section label="Cardio" aside={`${endurance.length}`}>
             {endurance.map((row) => (
               <Endurance key={row.exercise} row={row} />
             ))}
@@ -175,9 +179,9 @@ function EnduranceBody({ row }: { row: PrRow }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <span className="selectable" style={{ fontSize: 'var(--t-base)', lineHeight: 1.2 }}>
           {row.exercise}
-          {/* Read from the row's own pattern rather than assumed from the section. "Cardio &
-              timed" also holds planks, which are Core — so hard-coding green here would put a
-              cardio label on an ab exercise. */}
+          {/* Still read from the row rather than hard-coded green. This section is cardio-only
+              now, but the colour has one source of truth and that should not depend on which
+              list a row happens to be in. */}
           <span className="cap" style={{ color: patternColor(row.pattern), marginLeft: 8 }}>
             {patternLabel(row.pattern)}
           </span>
@@ -231,18 +235,39 @@ function EnduranceBody({ row }: { row: PrRow }) {
  * the calisthenic equivalent of adding weight to the bar, whereas total reps mostly measures how
  * long you spent. The total is still shown, in the meta line where volume sits on a loaded row.
  */
-function Calisthenic({ row, max, index }: { row: PrRow; max: number; index: number }) {
+function Calisthenic(props: { row: PrRow; maxReps: number; maxHold: number; index: number }) {
   return (
-    <Link href={`/lifts/${encodeURIComponent(row.exercise)}`} className="pressable" style={{ display: 'block' }}>
-      <CalisthenicBody row={row} max={max} index={index} />
+    <Link
+      href={`/lifts/${encodeURIComponent(props.row.exercise)}`}
+      className="pressable"
+      style={{ display: 'block' }}
+    >
+      <CalisthenicBody {...props} />
     </Link>
   );
 }
 
-function CalisthenicBody({ row, max, index }: { row: PrRow; max: number; index: number }) {
-  const best = row.best_reps;
+function CalisthenicBody({
+  row,
+  maxReps,
+  maxHold,
+  index,
+}: {
+  row: PrRow;
+  maxReps: number;
+  maxHold: number;
+  index: number;
+}) {
   const stale = daysAgo(row.last_performed) > 28;
-  const pct = best !== null ? (best / max) * 100 : 0;
+
+  // Reps when the movement has them, hold time when it does not. A plank has no reps at all,
+  // and printing "— REPS" over it was the whole reason it used to sit under Cardio.
+  const reps = row.best_reps;
+  const hold = n(row.best_duration_min);
+  const isReps = reps !== null;
+  const value = isReps ? String(reps) : dec(hold, hold !== null && hold < 10 ? 1 : 0);
+  const unit = isReps ? 'REPS' : 'MIN';
+  const pct = isReps ? (reps / maxReps) * 100 : hold !== null ? (hold / maxHold) * 100 : 0;
 
   return (
     <div style={{ padding: '12px 0', borderTop: '1px solid var(--rule)', opacity: stale ? 0.55 : 1 }}>
@@ -254,8 +279,8 @@ function CalisthenicBody({ row, max, index }: { row: PrRow; max: number; index: 
           </span>
         </span>
         <span className="mono" style={{ fontSize: 'var(--t-xl)', fontWeight: 500, lineHeight: 1 }}>
-          {best ?? '—'}
-          <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 4 }}>REPS</span>
+          {value}
+          <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 4 }}>{unit}</span>
         </span>
       </div>
 
@@ -285,9 +310,13 @@ function CalisthenicBody({ row, max, index }: { row: PrRow; max: number; index: 
           color: 'var(--ink-faint)',
         }}
       >
-        <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-dim)' }}>
-          best {row.best_reps_on ? shortDay(row.best_reps_on) : '—'}
-        </span>
+        {/* Only reps carry a best-set date — it comes from the CTE that requires reps, so a hold
+            has none. A bare "best set" with nothing after it was worse than no label at all. */}
+        {isReps && row.best_reps_on ? (
+          <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-dim)' }}>
+            best {shortDay(row.best_reps_on)}
+          </span>
+        ) : null}
         <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
           {row.total_bodyweight_reps !== null ? `${int(row.total_bodyweight_reps)} reps · ` : ''}
           {row.total_sets} sets · {agoLabel(row.last_performed).toLowerCase()}

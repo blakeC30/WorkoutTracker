@@ -86,11 +86,19 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
       group by exercise_id
     )
     select m.exercise, m.category, m.pattern,
-           -- Loaded wins when an exercise has both: a weighted pull-up is measured by the
-           -- weight, and the bodyweight sets still count toward its total.
+           -- Grouped by KIND of exercise, not by unit of measurement.
+           --
+           -- Measuring-unit was the obvious split — weight, reps, distance/time — but it filed
+           -- planks beside the rowing machine, because a hold is recorded in minutes. Reading
+           -- "cardio" over an ab exercise is worse than having two units in one section, and
+           -- the unit argument was weak anyway: the loaded section already puts a 380lb leg
+           -- press next to a 42lb curl.
+           --
+           -- Loaded still wins when an exercise has both, so a weighted pull-up is measured by
+           -- the weight while its bodyweight sets still count toward the total.
            case when h.exercise_id is not null then 'weighted'
-                when c.exercise_id is not null then 'bodyweight'
-                else 'endurance' end as record_type,
+                when m.pattern = 'cardio'      then 'endurance'
+                else 'bodyweight' end as record_type,
            c.reps              as best_reps,
            c.entry_date::text  as best_reps_on,
            sum(m.reps) filter (where coalesce(m.weight_lbs, 0) = 0)::int as total_bodyweight_reps,
