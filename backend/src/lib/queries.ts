@@ -169,6 +169,12 @@ export async function logEntry(
       const carbs = derive(m.carbs_g, perServing?.carbs_g);
       const fat = derive(m.fat_g, perServing?.fat_g);
 
+      // A row whose macros came from a recipe is high confidence by definition — the
+      // estimate now lives in the recipe, which is the thing that gets refined. Defaulting
+      // it here rather than asking the model to remember: it left confidence null on every
+      // recipe-linked row even with the rule stated in the prompt.
+      const confidence = m.confidence ?? (recipeId !== null ? 'high' : null);
+
       // No uniqueness constraint on meals — several meals a day is normal.
       await client.query(
         `insert into meals
@@ -178,7 +184,7 @@ export async function logEntry(
         [
           journalId, m.entry_date, m.meal_type ?? null, m.description,
           recipeId, m.servings ?? null, calories, protein, carbs, fat,
-          m.confidence ?? null,
+          confidence,
         ],
       );
       meals.push({ description: m.description, entry_date: m.entry_date, recipe: savedRecipe });
