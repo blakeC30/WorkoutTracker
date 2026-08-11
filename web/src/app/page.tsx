@@ -1,6 +1,7 @@
 import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type FoodRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Swatch } from '@/components/ui';
+import { Masthead, Section, Rule, Figure, BarRow, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
+import { WeightChart } from '@/components/WeightChart';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
 import Link from 'next/link';
@@ -98,46 +99,9 @@ function Bodyweight({ result }: { result: Awaited<ReturnType<typeof getBodyweigh
       </Section>
     );
   }
-
-  const rows = result.rows;
-  if (rows.length === 0) {
-    return (
-      <Section label="Bodyweight">
-        <Empty>No weigh-ins in the last 90 days. Tell Claude your weight and it lands here.</Empty>
-      </Section>
-    );
-  }
-
-  const latest = rows[rows.length - 1];
-  const current = n(latest.weight_lbs);
-  const smoothed = n(latest.rolling_7d);
-
-  // Compared against the smoothed line, not against the raw reading 30 days ago — one heavy
-  // dinner four weeks ago should not be the baseline the whole trend is measured from.
-  const monthAgo = rows.find((r) => daysBetween(r.date, latest.date) <= 30) ?? rows[0];
-  const change = smoothed !== null && n(monthAgo.rolling_7d) !== null ? smoothed - n(monthAgo.rolling_7d)! : null;
-
-  // The rolling average is what the sparkline draws. Daily noise is a couple of pounds either
-  // way and would bury a trend this shallow.
-  const series = rows.map((r) => n(r.rolling_7d)).filter((v): v is number => v !== null);
-
-  return (
-    <Section label="Bodyweight" aside={agoLabel(latest.date)}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-        <Figure value={dec(current)} unit="LB" size="var(--t-3xl)" count={current} decimals={1} />
-        <Delta value={change} unit="lb" over="30d" />
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <Sparkline points={series} height={54} />
-      </div>
-
-      <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-        <span>7-day avg {dec(smoothed)}</span>
-        <span style={{ color: 'var(--ink-faint)' }}>{rows.length} weigh-ins / 90d</span>
-      </div>
-    </Section>
-  );
+  // The section itself is a Client Component now: reading a specific day off the line needs
+  // pointer state, and the empty and error states live close to the thing that renders them.
+  return <WeightChart rows={result.rows} />;
 }
 
 function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) {
@@ -379,10 +343,3 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPatte
   );
 }
 
-// --- Helpers ----------------------------------------------------------------------------
-
-function daysBetween(a: string, b: string): number {
-  const [ay, am, ad] = a.split('-').map(Number);
-  const [by, bm, bd] = b.split('-').map(Number);
-  return Math.abs(new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime()) / 86_400_000;
-}

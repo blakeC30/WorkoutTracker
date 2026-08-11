@@ -188,11 +188,18 @@ export function Sparkline({
   tone = 'var(--signal)',
   fill = true,
   floor = 0,
+  activeIndex = null,
 }: {
   points: number[];
   height?: number;
   tone?: string;
   fill?: boolean;
+  /**
+   * The point being read, when something is scrubbing the chart. Draws a guide down to it and
+   * moves the marker there; null leaves the marker on the latest value, which is the resting
+   * state and what the chart means when nobody is touching it.
+   */
+  activeIndex?: number | null;
   /**
    * Minimum span of the y-axis, in data units.
    *
@@ -218,7 +225,8 @@ export function Sparkline({
   const coords = points.map((p, i) => [i * step, H - ((p - lo) / span) * H] as const);
   const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
   const area = `${line} L${W},${H} L0,${H} Z`;
-  const [lastX, lastY] = coords[coords.length - 1];
+  const at = activeIndex === null ? coords.length - 1 : Math.min(Math.max(activeIndex, 0), coords.length - 1);
+  const [lastX, lastY] = coords[at];
 
   return (
     <svg
@@ -238,6 +246,20 @@ export function Sparkline({
           Drawn as a zero-length round-capped LINE rather than a <circle>: the viewBox is
           stretched unequally by preserveAspectRatio="none", which turns a circle into an
           ellipse. Stroke geometry escapes that via non-scaling-stroke, so the cap stays round. */}
+      {/* A guide only while scrubbing. At rest the marker alone is enough, and a permanent
+          vertical rule would be one more line on a screen already made of them. */}
+      {activeIndex !== null ? (
+        <line
+          x1={lastX}
+          y1={0}
+          x2={lastX}
+          y2={H}
+          stroke={tone}
+          strokeWidth={1}
+          opacity={0.35}
+          vectorEffect="non-scaling-stroke"
+        />
+      ) : null}
       <line
         x1={lastX}
         y1={lastY}
