@@ -87,10 +87,17 @@ export const inlineExercise = z.object({
     .array(z.string())
     .optional()
     .describe(
-      'Muscles this mainly trains, e.g. ["quads", "glutes"]. Use names from list_muscles — ' +
-        'unknown names are rejected so the catalog stays consistent.',
+      'ALWAYS supply at least one. Muscles this movement mainly trains, e.g. ["quads", ' +
+        '"glutes"]; for cardio it is ["cardiovascular"]. Names must come from list_muscles — ' +
+        'unknown ones are rejected so the catalog stays consistent. An exercise saved without ' +
+        'these is invisible to every muscle-coverage question forever after, and nothing ' +
+        'later notices it is missing. Optional in the schema only so a whole log entry is ' +
+        'never rejected over metadata — not because leaving it out is acceptable.',
     ),
-  secondary_muscles: z.array(z.string()).optional(),
+  secondary_muscles: z
+    .array(z.string())
+    .optional()
+    .describe('Muscles that assist. Names from list_muscles.'),
   notes: z.string().optional(),
 });
 
@@ -237,8 +244,38 @@ export const getJournalInput = z.object({
   end_date: entryDate.describe('Last day to include, YYYY-MM-DD. Inclusive.'),
 });
 
-export const undoEntryInput = z.object({
-  journal_id: z.number().int().positive().describe('The journal id to delete.'),
+/**
+ * Deletion is addressed two ways because there are two real requests.
+ *
+ * "That whole message was wrong" wants the journal. "That one dish was wrong" wants the row.
+ * A tool offering only the first makes the second impossible whenever one message logged
+ * several things — which is most messages.
+ */
+export const deleteEntriesInput = z.object({
+  journal_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Delete everything a single message produced. The journal text itself is KEPT — only ' +
+        'the workouts, meals and weigh-ins parsed from it are removed.',
+    ),
+  workout_ids: z
+    .array(z.number().int().positive())
+    .optional()
+    .describe(
+      'Specific workouts to delete, by id from get_recent_history. A workout is one exercise ' +
+        'on one day; its sets go with it.',
+    ),
+  meal_ids: z
+    .array(z.number().int().positive())
+    .optional()
+    .describe('Specific meals to delete, by id from get_recent_history. One meal is one dish.'),
+  bodyweight_ids: z
+    .array(z.number().int().positive())
+    .optional()
+    .describe('Specific weigh-ins to delete, by id from get_recent_history.'),
   confirm: z
     .boolean()
     .default(false)

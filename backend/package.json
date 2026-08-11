@@ -11,7 +11,8 @@
     "start": "next start",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
-    "seed:clear": "node --env-file=.env.local scripts/seed-clear.mjs"
+    "seed:clear": "node --env-file=.env.local scripts/seed-clear.mjs",
+    "verify:e2e": "node --env-file=.env.local scripts/verify-e2e.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

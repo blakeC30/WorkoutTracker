@@ -13,7 +13,7 @@ import {
   logEntryInput,
   saveExerciseInput,
   saveFoodInput,
-  undoEntryInput,
+  deleteEntriesInput,
 } from './schemas';
 import {
   getExerciseHistory,
@@ -24,8 +24,8 @@ import {
 } from './stats';
 import { getPatternRecency } from './day';
 import {
-  deleteJournal,
-  describeJournal,
+  deleteEntries,
+  resolveDeletion,
   getJournal,
   getRecentHistory,
   listMuscles,
@@ -127,40 +127,79 @@ export const mcpHandler = createMcpHandler(
     );
 
     server.registerTool(
-      'undo_entry',
+      'delete_entries',
       {
-        title: 'Delete a journal entry and everything from it',
+        title: 'Delete logged rows (journals are always kept)',
         description:
-          'Delete a journal entry and every workout, bodyweight and meal row parsed from it. ' +
-          'ALWAYS call first with confirm: false, show the user exactly what would be deleted, ' +
-          'and wait for them to say yes. Only then call again with confirm: true. Never pass ' +
-          'confirm: true on the first call, even if the user sounds certain.',
-        inputSchema: undoEntryInput,
+          'Remove logged data. Address it EITHER by journal_id — everything one message ' +
+          'produced — OR by specific workout_ids / meal_ids / bodyweight_ids from ' +
+          'get_recent_history, when only part of a message was wrong. The two can be ' +
+          'combined and are unioned.\n\n' +
+          'The journal text is NEVER deleted, only the rows parsed from it. The journal is ' +
+          'the record of what was said, and it was said; what can be wrong is how it was ' +
+          'interpreted, and that is what this removes.\n\n' +
+          'ALWAYS call first with confirm: false, show the user exactly what would be ' +
+          'removed, and wait for them to say yes. Only then call again with confirm: true. ' +
+          'Never pass confirm: true on the first call, even if the user sounds certain. If ' +
+          'the preview contains something they did not ask to remove, say so and stop.',
+        inputSchema: deleteEntriesInput,
       },
-      async ({ journal_id, confirm }) => {
-        const found = await describeJournal(journal_id);
-        if (!found) {
-          return text(`No journal entry #${journal_id}. Nothing was deleted.`);
-        }
-
-        const lines = [
-          `Journal #${journal_id}, written ${found.journal.created_at}:`,
-          `  "${found.journal.raw_text}"`,
-        ];
-        for (const w of found.workouts) lines.push(`  workout: ${w.exercise} on ${w.entry_date}`);
-        for (const b of found.bodyweight) lines.push(`  bodyweight: ${b.weight_lbs} lbs on ${b.entry_date}`);
-        for (const m of found.meals) lines.push(`  meal: ${m.description} on ${m.entry_date}`);
-
-        if (!confirm) {
+      async ({ journal_id, workout_ids, meal_ids, bodyweight_ids, confirm }) => {
+        if (!journal_id && !workout_ids?.length && !meal_ids?.length && !bodyweight_ids?.length) {
           return text(
-            `This would permanently delete:\n\n${lines.join('\n')}\n\n` +
-              `Nothing has been deleted yet. Ask the user to confirm, then call undo_entry ` +
-              `again with confirm: true.`,
+            'Nothing to delete: pass a journal_id, or ids from get_recent_history. Nothing ' +
+              'was changed.',
           );
         }
 
-        await deleteJournal(journal_id);
-        return text(`Deleted:\n\n${lines.join('\n')}`);
+        const found = await resolveDeletion({
+          journal_id, workout_ids, meal_ids, bodyweight_ids,
+        });
+
+        if (found.empty) {
+          return text(
+            'No matching rows — they may already have been deleted. Nothing was changed. ' +
+              'Call get_recent_history to see what is actually there.',
+          );
+        }
+
+        const lines: string[] = [];
+        for (const w of found.workouts) {
+          const s = w.set_count === 1 ? '1 set' : `${w.set_count} sets`;
+          lines.push(`  workout #${w.id}: ${w.exercise}, ${s} on ${w.entry_date}`);
+        }
+        for (const b of found.bodyweight) {
+          lines.push(`  bodyweight #${b.id}: ${b.weight_lbs} lbs on ${b.entry_date}`);
+        }
+        for (const m of found.meals) {
+          lines.push(
+            `  meal #${m.id}: ${m.servings} x ${m.food} on ${m.entry_date}` +
+              `${m.meal_type ? ` (${m.meal_type})` : ''}`,
+          );
+        }
+
+        // Named explicitly rather than left implicit: the text survives but stops appearing
+        // anywhere in the dashboard, since a day is assembled from the rows recorded against
+        // it. Saying so is the difference between a kept record and a lost one.
+        const orphanNote = found.orphaned.length === 0 ? '' :
+          `\n\nThese journals will be kept but will have nothing recorded from them, so they ` +
+          `will no longer appear on any day:\n` +
+          found.orphaned.map((o) => `  #${o.id} "${o.raw_text}"`).join('\n');
+
+        if (!confirm) {
+          return text(
+            `This would permanently delete:\n\n${lines.join('\n')}${orphanNote}\n\n` +
+              `The journal text is kept either way. Nothing has been deleted yet — ask the ` +
+              `user to confirm, then call delete_entries again with confirm: true.`,
+          );
+        }
+
+        const n = await deleteEntries(found.ids);
+        return text(
+          `Deleted:\n\n${lines.join('\n')}\n\n` +
+            `${n.workouts} workout(s), ${n.meals} meal(s), ${n.bodyweight} weigh-in(s). ` +
+            `Journal text kept.`,
+        );
       },
     );
     server.registerTool(
@@ -359,7 +398,7 @@ export const mcpHandler = createMcpHandler(
     // around fields it cannot see. This string is the only way to tell from a running
     // conversation which vintage the client is actually holding: ask it what the server version
     // is, and if it disagrees with what is deployed, the connector needs removing and re-adding.
-    serverInfo: { name: 'workout-tracker', version: '0.7.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.8.0' },
 
     /*
      * These instructions are sent on every connection, and they are the layer that has to
@@ -421,10 +460,15 @@ export const mcpHandler = createMcpHandler(
       'is a property of the MOVEMENT, not of the muscles: a bench press is push even though ' +
       'the triceps work hard, and a curl is pull even though it is also an arm. Anything ' +
       'pressing away from the body is push, anything pulling toward it is pull, squats and ' +
-      'hinges and lunges are legs. Muscle names must come from list_muscles — anything else ' +
-      'is rejected. Primary means what the movement is FOR, not merely what is active: on a ' +
-      'cardio exercise that is "cardiovascular" with the legs secondary, because marking the ' +
-      'legs primary makes every run register as leg training.\n\n' +
+      'hinges and lunges are legs.\n\n' +
+
+      'ALWAYS give a new exercise at least one primary muscle, using names from list_muscles ' +
+      '— anything else is rejected. This is not optional in practice: an exercise catalogued ' +
+      'without it is invisible to every muscle-coverage question from then on, and nothing ' +
+      'ever flags it as missing. Primary means what the movement is FOR, not merely what is ' +
+      'active: on a cardio exercise that is "cardiovascular" with the legs secondary, because ' +
+      'marking the legs primary makes every run register as leg training. A push-up is chest ' +
+      'and triceps, not nothing.\n\n' +
 
       'SETS: give ONE entry per set actually performed. "3x5 at 225" is three identical ' +
       'entries; "225x5, 245x3, 265x1" is three different ones — flattening a ramp to one ' +
@@ -447,10 +491,15 @@ export const mcpHandler = createMcpHandler(
       'corrected spelling inline creates a second exercise and splits the history instead of ' +
       'repairing it. Say when a correction will move past days\' totals, because it will.\n\n' +
 
-      'DELETING: undo_entry removes a journal entry and everything recorded from it. ALWAYS ' +
-      'call it first with confirm: false, show the user exactly what would be removed, and ' +
-      'wait for them to agree. Never pass confirm: true on the first call, however certain ' +
-      'they sound.\n\n' +
+      'DELETING: delete_entries removes logged rows. JOURNAL TEXT IS NEVER DELETED and there ' +
+      'is no tool that deletes it — the journal is the record of what was said, and it was ' +
+      'said; only the rows parsed out of it can be wrong. Do not offer to delete a journal. ' +
+      'Remove a whole message\'s output with journal_id, or single rows with the ids from ' +
+      'get_recent_history when only part of a message was wrong — "delete the basketball" ' +
+      'when that message also logged deadlifts is one workout id, not the journal. ALWAYS ' +
+      'call first with confirm: false, show the user exactly what would be removed, and wait ' +
+      'for them to agree. Never pass confirm: true on the first call, however certain they ' +
+      'sound. If the preview holds anything they did not ask to remove, say so and stop.\n\n' +
 
       'ANSWERING QUESTIONS: pull the real data before commenting on it. get_pattern_recency ' +
       'for what is overdue, get_pattern_volume for balance, get_exercise_history for where a ' +

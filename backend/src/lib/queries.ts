@@ -288,7 +288,10 @@ export async function getRecentHistory(days: number) {
   const sql = getSql();
 
   const [workouts, bodyweight, meals] = await Promise.all([
-    sql`select w.entry_date::text as entry_date, e.name as exercise, e.category, e.pattern, w.notes,
+    // Ids are returned so rows can be deleted individually. Without them the only thing
+    // addressable is a whole journal, which is why "delete just the basketball" used to be
+    // impossible when the same message also logged a deadlift session.
+    sql`select w.id, w.journal_id, w.entry_date::text as entry_date, e.name as exercise, e.category, e.pattern, w.notes,
                count(s.id)::int as set_count,
                max(s.weight_lbs) as top_weight_lbs,
                sum(s.reps) as total_reps,
@@ -304,13 +307,13 @@ export async function getRecentHistory(days: number) {
         join exercises e on e.id = w.exercise_id
         left join workout_sets s on s.workout_id = w.id
         where w.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
-        group by w.id, w.entry_date, e.name, e.category, e.pattern, w.notes
+        group by w.id, w.journal_id, w.entry_date, e.name, e.category, e.pattern, w.notes
         order by w.entry_date desc, e.name`,
-    sql`select entry_date::text as entry_date, weight_lbs, notes
+    sql`select id, journal_id, entry_date::text as entry_date, weight_lbs, notes
         from bodyweight
         where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc`,
-    sql`select m.entry_date::text as entry_date, m.meal_type, f.name as food,
+    sql`select m.id, m.journal_id, m.entry_date::text as entry_date, m.meal_type, f.name as food,
                f.unit_label, m.servings, m.note,
                round(f.calories  * m.servings) as calories,
                round(f.protein_g * m.servings) as protein_g,
@@ -339,39 +342,114 @@ export async function getJournal(startDate: string, endDate: string) {
   return { start_date: startDate, end_date: endDate, entries };
 }
 
-/** What a journal row and its children look like, for the undo preview. */
-export async function describeJournal(journalId: number) {
+/**
+ * Resolves what a deletion would remove, without removing it.
+ *
+ * Rows are addressable two ways and they union: by the journal that produced them, or by their
+ * own ids. Both exist because the two real requests are different — "that whole message was
+ * wrong" and "that one dish was wrong" — and collapsing them into one would make the common
+ * case clumsy or the precise case impossible.
+ *
+ * Journals are NOT in the return value as deletion targets, because they are never deleted.
+ * They appear only as context: which message each doomed row came from, and which messages
+ * will be left having produced nothing.
+ */
+export async function resolveDeletion(input: {
+  journal_id?: number;
+  workout_ids?: number[];
+  meal_ids?: number[];
+  bodyweight_ids?: number[];
+}) {
   const sql = getSql();
+  const j = input.journal_id ?? null;
+  const w = input.workout_ids ?? [];
+  const m = input.meal_ids ?? [];
+  const b = input.bodyweight_ids ?? [];
 
-  const [journal] = await sql`
-    select id, raw_text, source,
-           to_char(created_at at time zone ${APP_TIMEZONE}, 'YYYY-MM-DD HH24:MI') as created_at
-    from journals where id = ${journalId}`;
-  if (!journal) return null;
-
-  const [workouts, bodyweight, meals] = await Promise.all([
-    sql`select w.entry_date::text as entry_date, e.name as exercise,
+  const [workouts, meals, bodyweight] = await Promise.all([
+    sql`select wo.id, wo.journal_id, wo.entry_date::text as entry_date, e.name as exercise,
                count(s.id)::int as set_count
-        from workouts w
-        join exercises e on e.id = w.exercise_id
-        left join workout_sets s on s.workout_id = w.id
-        where w.journal_id = ${journalId}
-        group by w.id, w.entry_date, e.name order by e.name`,
-    sql`select entry_date::text as entry_date, weight_lbs from bodyweight where journal_id = ${journalId}`,
-    sql`select m.entry_date::text as entry_date, m.meal_type, f.name as description,
-               m.servings, round(f.calories * m.servings) as calories
-        from meals m join foods f on f.id = m.food_id
-        where m.journal_id = ${journalId} order by m.id`,
+        from workouts wo
+        join exercises e on e.id = wo.exercise_id
+        left join workout_sets s on s.workout_id = wo.id
+        where (${j}::bigint is not null and wo.journal_id = ${j}::bigint)
+           or wo.id = any(${w}::bigint[])
+        group by wo.id, wo.journal_id, wo.entry_date, e.name
+        order by wo.entry_date, e.name`,
+    sql`select me.id, me.journal_id, me.entry_date::text as entry_date, me.meal_type,
+               me.servings, f.name as food,
+               round(f.calories * me.servings) as calories
+        from meals me join foods f on f.id = me.food_id
+        where (${j}::bigint is not null and me.journal_id = ${j}::bigint)
+           or me.id = any(${m}::bigint[])
+        order by me.entry_date, me.id`,
+    sql`select id, journal_id, entry_date::text as entry_date, weight_lbs
+        from bodyweight
+        where (${j}::bigint is not null and journal_id = ${j}::bigint)
+           or id = any(${b}::bigint[])
+        order by entry_date`,
   ]);
 
-  return { journal, workouts, bodyweight, meals };
+  const ids = {
+    workouts: workouts.map((r) => Number(r.id)),
+    meals: meals.map((r) => Number(r.id)),
+    bodyweight: bodyweight.map((r) => Number(r.id)),
+  };
+
+  // Journals that would be left having produced nothing at all. Worth surfacing because the
+  // text survives while becoming unreachable from the dashboard — the day page finds journals
+  // through the rows they produced, so a journal with none appears on no day.
+  const touched = [...new Set([...workouts, ...meals, ...bodyweight]
+    .map((r) => (r.journal_id === null ? null : Number(r.journal_id)))
+    .filter((x): x is number => x !== null))];
+
+  const orphaned = touched.length === 0 ? [] : await sql`
+    select jo.id, left(jo.raw_text, 120) as raw_text
+    from journals jo
+    where jo.id = any(${touched}::bigint[])
+      and not exists (select 1 from workouts   x where x.journal_id = jo.id
+                        and not (x.id = any(${ids.workouts}::bigint[])))
+      and not exists (select 1 from meals      x where x.journal_id = jo.id
+                        and not (x.id = any(${ids.meals}::bigint[])))
+      and not exists (select 1 from bodyweight x where x.journal_id = jo.id
+                        and not (x.id = any(${ids.bodyweight}::bigint[])))
+    order by jo.id`;
+
+  return { workouts, meals, bodyweight, orphaned, ids, empty: ids.workouts.length === 0 && ids.meals.length === 0 && ids.bodyweight.length === 0 };
 }
 
-/** Deletes a journal row. The ON DELETE CASCADE removes everything parsed from it. */
-export async function deleteJournal(journalId: number): Promise<boolean> {
-  const sql = getSql();
-  const rows = await sql`delete from journals where id = ${journalId} returning id`;
-  return rows.length > 0;
+/**
+ * Deletes log rows. Never a journal.
+ *
+ * The journal is the record of what was SAID, and it was said — deleting it would falsify the
+ * account. What gets removed here is the INTERPRETATION: the rows parsed out of that text,
+ * which are the only part that can be wrong. This is the same rule the dashboard already
+ * follows when a value is corrected by hand, extended from editing to deleting.
+ *
+ * `on delete cascade` from journals is deliberately left in place even though nothing here
+ * uses it. It costs nothing, it is what `npm run seed:clear` deletes through, and a policy
+ * enforced in one function is easier to change than a dropped constraint is to restore.
+ */
+export async function deleteEntries(ids: {
+  workouts: number[];
+  meals: number[];
+  bodyweight: number[];
+}): Promise<{ workouts: number; meals: number; bodyweight: number }> {
+  const client = await getPool().connect();
+  try {
+    await client.query('begin');
+    // workout_sets go with their workout through the cascade in migration 005.
+    const w = await client.query('delete from workouts where id = any($1::bigint[])', [ids.workouts]);
+    const m = await client.query('delete from meals where id = any($1::bigint[])', [ids.meals]);
+    const b = await client.query('delete from bodyweight where id = any($1::bigint[])', [ids.bodyweight]);
+    await client.query('commit');
+    return { workouts: w.rowCount ?? 0, meals: m.rowCount ?? 0, bodyweight: b.rowCount ?? 0 };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**

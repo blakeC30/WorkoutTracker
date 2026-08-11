@@ -136,7 +136,7 @@ Fifteen, defined in `backend/src/lib/mcp.ts` with their inputs in `backend/src/l
 | Tool                    | Kind    | For                                                          |
 | ----------------------- | ------- | ------------------------------------------------------------ |
 | `log_entry`             | write   | One message of training, food, and/or bodyweight, as one journal entry |
-| `undo_entry`            | write   | Delete a journal entry and everything from it. Preview first  |
+| `delete_entries`        | write   | Delete logged rows, by journal or individually. Preview first |
 | `save_food`             | write   | Create or correct a food. Fixes every meal ever logged with it |
 | `save_exercise`         | write   | Create or correct an exercise. **The only way to rename one** |
 | `search_foods`          | read    | Fuzzy food lookup — call before logging a meal                |
@@ -236,6 +236,14 @@ is created, and why `foods` and `exercises` each have a unique index on `lower(n
   journal row stamped today and a workout row dated yesterday. Never derive one from the other.
 - `journal_id` is nullable — rows created or corrected by hand in the dashboard have no
   journal origin. Don't invent placeholder journals for them.
-- Deleting a journal cascades to everything parsed from it. That's what powers undo.
+- **Journals are never deleted by any tool.** A journal records what was *said*, and it was
+  said; what can be wrong is how it was interpreted, and that is the rows. `delete_entries`
+  removes rows — a whole message's output, or single rows by id — and always leaves the text.
+  The `on delete cascade` on `journal_id` stays anyway: it costs nothing, `seed:clear` deletes
+  through it, and a policy in one function is easier to change than a dropped constraint is to
+  restore.
+- A journal whose rows are all deleted keeps its text but stops appearing in the dashboard,
+  because a day is assembled from the rows recorded against it. `delete_entries` says so in
+  the preview rather than letting it be a surprise.
 - The journal is provenance, not state. If a value is corrected in the dashboard, the stored
   number wins and the journal text is left alone.
