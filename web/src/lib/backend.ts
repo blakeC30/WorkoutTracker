@@ -180,10 +180,18 @@ export type RecencyRow = {
 
 export const getRecency = () => query<RecencyRow>('/api/stats/recency');
 
-/** Volume by movement pattern. No fan-out here — pattern is one column on the exercise. */
+/**
+ * Training by pattern. No fan-out here — pattern is one column on the exercise.
+ *
+ * Four independent measures, each null when never recorded. One pattern can produce several at
+ * once: core covers weighted crunches (tonnage), situps (reps) and planks (time), and cardio
+ * may be logged in miles, minutes, or both.
+ */
 export type PatternVolumeRow = {
   pattern: string;
   volume_lbs: Num;
+  /** Reps performed with no external load. Weighted reps are counted in `volume_lbs` instead. */
+  bodyweight_reps: Num;
   sessions: number;
   days: number;
   distance_mi: Num;

@@ -282,11 +282,12 @@ function Gap({ row }: { row: RecencyRow }) {
 }
 
 /**
- * Four weeks of work, by movement pattern.
+ * Four weeks of work, by movement pattern, in whatever units it was recorded in.
  *
- * Cardio is reported separately rather than as a sixth bar: it has no tonnage, so a bar scaled
- * against loaded volume would always read zero and imply you had not done it. Miles and minutes
- * are its real measures.
+ * Bars are tonnage only, because tonnage is the one measure comparable between patterns. Reps,
+ * miles and minutes each get named underneath rather than being folded in — converting between
+ * them would need an invented exchange rate, and dropping them made a month of situps or a run
+ * logged without a stopwatch look like nothing happened.
  */
 function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPattern>> }) {
   if (!result.ok) {
@@ -302,11 +303,29 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPatte
     (entry) => entry.row !== undefined,
   );
 
-  // Split, not filtered. A bar needs tonnage to have a length, and planks and cardio have none —
-  // so a bar chart drops them silently and the screen reads "you have not trained core in four
-  // weeks", which is a very different claim from "core was timed rather than loaded".
+  // Only tonnage can be a bar, because only tonnage is comparable between patterns. Everything
+  // else is reported in its own unit underneath.
   const loaded = trained.filter((entry) => n0(entry.row?.volume_lbs) > 0);
-  const timed = trained.filter((entry) => n0(entry.row?.volume_lbs) === 0);
+
+  // Every other measure a pattern actually recorded, named and in its own unit.
+  //
+  // This is deliberately not "the timed ones". Core is not only planks — situps, crunches and
+  // russian twists are unloaded REPS, and a weighted cable crunch is tonnage, so one pattern can
+  // legitimately produce three different measures in a week. Cardio is the same: a run may carry
+  // miles, minutes, or both. Assuming a single unit per pattern printed "Core — min" for a month
+  // of situps and "3.0 mi · — min" for a run logged without a stopwatch.
+  const other = trained
+    .map((entry) => {
+      const parts: string[] = [];
+      const reps = n(entry.row?.bodyweight_reps);
+      const distance = n(entry.row?.distance_mi);
+      const duration = n(entry.row?.duration_min);
+      if (reps !== null && reps > 0) parts.push(`${int(reps)} reps`);
+      if (distance !== null && distance > 0) parts.push(`${dec(distance, 1)} mi`);
+      if (duration !== null && duration > 0) parts.push(`${int(duration)} min`);
+      return { pattern: entry.pattern, parts };
+    })
+    .filter((entry) => entry.parts.length > 0);
 
   if (trained.length === 0) {
     return (
@@ -333,25 +352,26 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPatte
         />
       ))}
 
-      {timed.length > 0 ? (
-        <div
-          className="cap"
-          style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 14, color: 'var(--ink-faint)' }}
-        >
-          {timed.map((entry) => (
-            <span key={entry.pattern.key}>
-              <Swatch tone={entry.pattern.color} />
-              {entry.pattern.label}{' '}
-              {n0(entry.row?.distance_mi) > 0 ? `${dec(n(entry.row?.distance_mi), 1)} mi · ` : ''}
-              {int(n(entry.row?.duration_min))} min
-            </span>
-          ))}
+      {loaded.length > 0 ? (
+        <div className="cap" style={{ marginTop: 10, textAlign: 'right', color: 'var(--ink-faint)' }}>
+          {int(total)} lb lifted
         </div>
       ) : null}
 
-      <div className="cap" style={{ marginTop: 10, textAlign: 'right', color: 'var(--ink-faint)' }}>
-        {int(total)} lb loaded
-      </div>
+      {/* One line per pattern, listing only what was recorded. A pattern with a bar can appear
+          here too — weighted crunches and situps in the same week are both real and neither
+          converts into the other. */}
+      {other.length > 0 ? (
+        <div style={{ marginTop: loaded.length > 0 ? 14 : 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {other.map((entry) => (
+            <div key={entry.pattern.key} className="cap" style={{ color: 'var(--ink-faint)' }}>
+              <Swatch tone={entry.pattern.color} />
+              <span style={{ color: 'var(--ink-dim)' }}>{entry.pattern.label}</span>{' '}
+              {entry.parts.join(' · ')}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </Section>
   );
 }

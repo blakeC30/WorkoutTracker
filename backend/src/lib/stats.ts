@@ -153,16 +153,31 @@ export async function getExerciseHistory(name: string, limit = 120) {
 }
 
 /**
- * Training volume by movement pattern.
+ * Training by movement pattern, in every unit the work was actually recorded in.
  *
  * The muscle-region version of this has a fan-out trap; this one does not, because `pattern` is
  * a single column on the exercise rather than a many-to-many join. One session counts once.
+ *
+ * Four measures come back rather than one, because a pattern is not confined to a single kind
+ * of work. Core is the clearest case: a weighted cable crunch has tonnage, situps and russian
+ * twists are unloaded reps, and a plank is time — the same pattern in one week can legitimately
+ * produce all three. Cardio is the same story: a run might be logged with miles, or minutes, or
+ * both, and none of those is more correct than the others.
+ *
+ * Every measure is therefore reported independently and left NULL when it was never recorded.
+ * The alternative — folding everything into one number — would need an invented exchange rate
+ * between a rep and a minute, and would report the absence of a measure as a zero.
  */
 export async function getVolumeByPattern(days = 28) {
   const sql = getSql();
   return sql`
     select coalesce(e.pattern, 'other')          as pattern,
            round(sum(s.reps * s.weight_lbs))     as volume_lbs,
+           -- Reps done WITHOUT external load, kept apart from the tonnage above so a set of
+           -- situps and a set of weighted crunches are not added together into a number that
+           -- means neither. Sets carrying weight already count in volume_lbs.
+           sum(s.reps) filter (where s.weight_lbs is null or s.weight_lbs = 0)::int
+                                                 as bodyweight_reps,
            count(distinct w.id)::int             as sessions,
            count(distinct w.entry_date)::int     as days,
            round(sum(s.distance_mi), 2)          as distance_mi,
