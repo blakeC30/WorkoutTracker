@@ -2,7 +2,7 @@
 
 import { useActionState, useState, type ReactNode } from 'react';
 import { saveFoodMacros, type SaveState } from '@/app/food/actions';
-import type { ReviewRow } from '@/lib/backend';
+import type { FoodRow } from '@/lib/backend';
 import { n } from '@/lib/num';
 import { int } from '@/lib/format';
 
@@ -17,7 +17,7 @@ import { int } from '@/lib/format';
  * is the intended behaviour of the catalog and it should still be said out loud before you
  * press the button.
  */
-export function FoodEditor({ row, children }: { row: ReviewRow; children: ReactNode }) {
+export function FoodEditor({ row, children }: { row: FoodRow; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<SaveState, FormData>(saveFoodMacros, {
     status: 'idle',

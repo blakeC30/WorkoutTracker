@@ -1,4 +1,4 @@
-import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type ReviewRow } from '@/lib/backend';
+import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type FoodRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
@@ -70,7 +70,7 @@ export default async function Today() {
  * rather than the lone sans-serif list row it used to be, which was the only thing on Today
  * that did not look like the rest of the app.
  */
-function Review({ rows }: { rows: ReviewRow[] }) {
+function Review({ rows }: { rows: FoodRow[] }) {
   return (
     <Link href="/food" className="pressable" style={{ display: 'block' }}>
       <Section label="Needs review">

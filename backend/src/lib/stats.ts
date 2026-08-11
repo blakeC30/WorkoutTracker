@@ -408,6 +408,37 @@ export async function getVolumeByMuscle(days = 28) {
 }
 
 /**
+ * Every food eaten in the window, most frequent first.
+ *
+ * The Food screen used to list only the foods needing correction, which made it the one tab
+ * that could not browse its own catalog: no way to look up what a food contains, and no way to
+ * correct one that was not already flagged. Exercises browses the other catalog completely, and
+ * these two tables are the same kind of thing.
+ *
+ * Ordered by how often a food is eaten rather than by calories contributed. The question here
+ * is "what do I actually live on", and a staple eaten twenty-seven times is the answer even
+ * when a single large meal outweighs it.
+ *
+ * Scoped to the same window the screen's chart uses, so the list is what you are eating now
+ * rather than everything you have ever logged.
+ */
+export async function getFoods(days = 30, limit = 60) {
+  const sql = getSql();
+  return sql`
+    select f.id, f.name, f.unit_label, f.confidence,
+           f.calories, f.protein_g, f.carbs_g, f.fat_g,
+           count(m.id)::int                    as times_eaten,
+           round(sum(f.calories * m.servings)) as total_calories,
+           max(m.entry_date)::text             as last_eaten
+    from foods f
+    join meals m on m.food_id = f.id
+    where m.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+    group by f.id
+    order by count(m.id) desc, f.name
+    limit ${limit}`;
+}
+
+/**
  * Foods whose macros are guesses, ordered by how much they actually matter.
  *
  * This is the dashboard's review queue. Ranking by total calories contributed rather than
