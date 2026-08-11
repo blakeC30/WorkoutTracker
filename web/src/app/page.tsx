@@ -1,5 +1,5 @@
-import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type PatternVolumeRow, type RecencyRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Row, Swatch } from '@/components/ui';
+import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type ReviewRow } from '@/lib/backend';
+import { Masthead, Section, Rule, Figure, Delta, BarRow, Sparkline, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
@@ -54,14 +54,7 @@ export default async function Today() {
       {review.ok && review.rows.length > 0 ? (
         <Reveal delay={240}>
           <Rule />
-          <Link href="/food" className="pressable" style={{ display: 'block' }}>
-            <Row
-              name={<span style={{ color: 'var(--flag)' }}>{review.rows.length} foods need review</span>}
-              meta={<span className="cap">Macros are estimates</span>}
-              right={<span className="mono" style={{ color: 'var(--ink-faint)' }}>→</span>}
-              style={{ borderTop: 'none' }}
-            />
-          </Link>
+          <Review rows={review.rows} />
         </Reveal>
       ) : null}
     </main>
@@ -69,6 +62,34 @@ export default async function Today() {
 }
 
 // --- Sections ---------------------------------------------------------------------------
+
+/**
+ * How much of the log rests on estimated macros.
+ *
+ * Built like every other block on this screen — a Section label, one mono figure, a caption —
+ * rather than the lone sans-serif list row it used to be, which was the only thing on Today
+ * that did not look like the rest of the app.
+ *
+ * The figure is the calories affected rather than the count of foods, because that is the
+ * number that says whether this is worth an afternoon: eleven foods could be eleven kcal or
+ * fifty thousand. The count moves to the aside, where every other section keeps its "how many".
+ */
+function Review({ rows }: { rows: ReviewRow[] }) {
+  const affected = rows.reduce((sum, row) => sum + n0(row.total_calories), 0);
+
+  return (
+    <Link href="/food" className="pressable" style={{ display: 'block' }}>
+      <Section label="Needs review" aside={`${rows.length} foods`}>
+        {/* --flag, not the pattern palette: this is the app's established "estimated, needs
+            fixing" colour, the same one the review queue and low-confidence dishes use. */}
+        <Figure value={int(affected)} unit="KCAL AFFECTED" count={affected} tone="var(--flag)" />
+        <div className="cap" style={{ marginTop: 12, color: 'var(--ink-faint)' }}>
+          Tap to correct their macros
+        </div>
+      </Section>
+    </Link>
+  );
+}
 
 function Bodyweight({ result }: { result: Awaited<ReturnType<typeof getBodyweight>> }) {
   if (!result.ok) {
