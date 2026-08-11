@@ -36,7 +36,7 @@ export function ListControls<T>({
   total: number;
 }) {
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 12 }}>
       <div style={{ position: 'relative' }}>
         <input
           value={query}
@@ -49,17 +49,7 @@ export function ListControls<T>({
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          className="mono selectable"
-          style={{
-            width: '100%',
-            minHeight: 44,
-            background: 'var(--panel)',
-            border: '1px solid var(--rule)',
-            borderRadius: 2,
-            color: 'var(--ink)',
-            fontSize: 'var(--t-base)',
-            padding: '0 34px 0 10px',
-          }}
+          className="mono selectable field"
         />
         {query ? (
           <button
@@ -71,10 +61,10 @@ export function ListControls<T>({
               position: 'absolute',
               right: 0,
               top: 0,
-              width: 34,
-              height: 44,
+              width: 22,
+              height: 38,
               color: 'var(--ink-faint)',
-              fontSize: 'var(--t-lg)',
+              fontSize: 'var(--t-base)',
             }}
           >
             ×
@@ -82,7 +72,7 @@ export function ListControls<T>({
         ) : null}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
         {sorts.map((sort) => {
           const active = sort.key === activeSort;
           return (
@@ -93,11 +83,11 @@ export function ListControls<T>({
               className="cap pressable"
               aria-pressed={active}
               style={{
-                minHeight: 34,
+                minHeight: 32,
                 color: active ? 'var(--signal)' : 'var(--ink-faint)',
-                // A rule under the active option rather than a filled pill — the same way the
-                // tab bar marks its current tab.
-                borderBottom: `2px solid ${active ? 'var(--signal)' : 'transparent'}`,
+                // A hairline under the active option rather than a filled pill — the same way
+                // the tab bar marks its current tab, one weight lighter.
+                borderBottom: `1px solid ${active ? 'var(--signal)' : 'transparent'}`,
                 paddingBottom: 2,
               }}
             >

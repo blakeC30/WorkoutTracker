@@ -150,6 +150,43 @@ button {
 
 /* --- Interaction ----------------------------------------------------------------------- */
 
+/* A text field, in the app's own idiom: a hairline, not a box.
+ *
+ * The boxed version was the only filled, bordered, rounded control anywhere here, which made a
+ * search field louder than the data it searches. Same rule the rest of the layout uses —
+ * whitespace first, a hairline second, and nothing beyond that. */
+.field {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 22px 0 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink);
+  font-size: var(--t-sm);
+  transition: border-color 0.15s ease-out;
+}
+
+.field::placeholder {
+  color: var(--ink-faint);
+}
+
+/* The underline going amber IS the focus indicator, so the default ring would be a second one
+   drawn around a control that has no box. Colour change is the affordance. */
+.field:focus,
+.field:focus-visible {
+  outline: none;
+  border-bottom-color: var(--signal);
+}
+
+/* iOS draws its own clear button and inner shadow on type="search". Both fight the hairline. */
+.field::-webkit-search-decoration,
+.field::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .pressable {
   transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
 }

@@ -91,7 +91,7 @@ export function FoodsList({ rows, capped }: { rows: FoodRow[]; capped: boolean }
       <ListControls
         query={query}
         onQuery={setQuery}
-        placeholder="Search foods"
+        placeholder="Search"
         sorts={SORTS}
         activeSort={sort}
         onSort={setSort}

@@ -48,7 +48,7 @@ export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean
       <ListControls
         query={query}
         onQuery={setQuery}
-        placeholder="Search exercises or pattern"
+        placeholder="Search"
         sorts={SORTS}
         activeSort={sort}
         onSort={setSort}
@@ -56,7 +56,9 @@ export function ExercisesList({ rows, capped }: { rows: PrRow[]; capped: boolean
         total={rows.length}
       />
 
-      {shown.length === 0 ? <Empty>Nothing matches “{query.trim()}”.</Empty> : null}
+      {shown.length === 0 ? (
+        <Empty>Nothing matches “{query.trim()}”. Movement patterns work too — try “pull”.</Empty>
+      ) : null}
 
       {weighted.length > 0 ? (
         <Section label="Loaded" aside={`${weighted.length}`}>
