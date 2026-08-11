@@ -82,17 +82,27 @@ export async function logEntry(
       if (w.exercise) {
         const ex = w.exercise;
         const { rows } = await client.query<{ id: string; name: string; created: boolean }>(
-          `insert into exercises (name, aliases, category, equipment, notes)
-           values ($1, coalesce($2::text[],'{}'), $3, $4, $5)
+          `insert into exercises (name, aliases, category, pattern, equipment, notes)
+           values ($1, coalesce($2::text[],'{}'), $3, $4, $5, $6)
            on conflict (name) do update set
              aliases   = (select coalesce(array_agg(distinct a), '{}')
                           from unnest(exercises.aliases || excluded.aliases) a),
              category  = coalesce(excluded.category,  exercises.category),
+             pattern   = coalesce(excluded.pattern,   exercises.pattern),
              equipment = coalesce(excluded.equipment, exercises.equipment),
              notes     = coalesce(excluded.notes,     exercises.notes),
              updated_at = now()
            returning id, name, (xmax = 0) as created`,
-          [ex.name.trim(), ex.aliases ?? null, ex.category ?? null, ex.equipment ?? null, ex.notes ?? null],
+          [
+            ex.name.trim(),
+            ex.aliases ?? null,
+            ex.category ?? null,
+            // Falls back to the category so a cardio exercise logged without a pattern still
+            // lands somewhere the calendar can group it, rather than in `other`.
+            ex.pattern ?? (ex.category === 'cardio' ? 'cardio' : null),
+            ex.equipment ?? null,
+            ex.notes ?? null,
+          ],
         );
         exerciseId = Number(rows[0].id);
         savedExercise = { id: exerciseId, name: rows[0].name, created: rows[0].created };

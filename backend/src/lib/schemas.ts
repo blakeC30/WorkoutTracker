@@ -59,6 +59,16 @@ export const inlineExercise = z.object({
   category: z
     .enum(['strength', 'cardio', 'mobility', 'sport', 'other'])
     .optional(),
+  pattern: z
+    .enum(['push', 'pull', 'legs', 'core', 'cardio', 'other'])
+    .optional()
+    .describe(
+      'Movement pattern, which is what the CALENDAR groups days by. This is a property of ' +
+        'the movement, not of the muscles: a bench press is "push" even though triceps work ' +
+        'hard, and a curl is "pull" even though it is also an arm. Anything pressing away ' +
+        'from the body is push; anything pulling toward it is pull; squats, hinges and lunges ' +
+        'are legs.',
+    ),
   equipment: z
     .string()
     .optional()

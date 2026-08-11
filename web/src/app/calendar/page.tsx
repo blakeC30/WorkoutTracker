@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { getCalendar, n, n0, type CalendarRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch } from '@/components/ui';
+import { getCalendar, getRecency, n, n0, type CalendarRow, type RecencyRow } from '@/lib/backend';
+import { Masthead, Section, Rule, Figure, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { compact, dec, int, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
 
@@ -10,22 +10,40 @@ export const dynamic = 'force-dynamic';
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 /**
- * A month at a glance, one square per day, tapping through to the full record.
+ * The five movement patterns, in a FIXED order that never changes.
  *
- * The squares carry two independent readings rather than a single "activity" score: an amber
- * bar for training volume and a dimmer one for calories. Blending them into one number would
- * make a heavy lifting day and a heavy eating day indistinguishable, which is exactly the
- * comparison this screen exists to make.
+ * That fixity is the whole encoding. Each slot in a calendar square always means the same
+ * thing, so a leg day and a pull day have different silhouettes and you learn to read them
+ * without a legend. Sorting these by frequency, or omitting patterns a day didn't train, would
+ * destroy the only property that makes a 6px mark legible.
  */
-export default async function Calendar({
-  searchParams,
-}: {
-  searchParams: Promise<{ m?: string }>;
-}) {
+const PATTERNS = [
+  { key: 'push', label: 'Push' },
+  { key: 'pull', label: 'Pull' },
+  { key: 'legs', label: 'Legs' },
+  { key: 'core', label: 'Core' },
+  { key: 'cardio', label: 'Cardio' },
+] as const;
+
+/**
+ * Only the three anchor meals get a slot.
+ *
+ * Snacks and desserts are genuinely optional, so their absence says nothing — but a missing
+ * lunch is almost always a missed log rather than a skipped meal, and that is the signal this
+ * row exists to surface.
+ */
+const MEALS = [
+  { key: 'breakfast', label: 'B' },
+  { key: 'lunch', label: 'L' },
+  { key: 'dinner', label: 'D' },
+] as const;
+
+export default async function Calendar({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
   const params = await searchParams;
   const key = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : monthKey(today());
   const shape = monthShape(key);
-  const result = await getCalendar(shape.from, shape.to);
+
+  const [result, recency] = await Promise.all([getCalendar(shape.from, shape.to), getRecency()]);
 
   return (
     <main className="screen">
@@ -43,8 +61,19 @@ export default async function Calendar({
           <Reveal delay={60}>
             <Grid rows={result.rows} monthKey={key} />
           </Reveal>
+
           <Rule />
           <Reveal delay={120}>
+            <Matrix rows={result.rows} monthKey={key} />
+          </Reveal>
+
+          <Rule />
+          <Reveal delay={180}>
+            <Recency result={recency} />
+          </Reveal>
+
+          <Rule />
+          <Reveal delay={240}>
             <Totals rows={result.rows} monthKey={key} />
           </Reveal>
         </>
@@ -55,12 +84,11 @@ export default async function Calendar({
   );
 }
 
-/** Month stepper. Plain links, so back and forward behave the way the phone expects. */
+// --- Month pager -------------------------------------------------------------------------
+
 function Pager({ current }: { current: string }) {
   const previous = shiftMonth(current, -1);
   const next = shiftMonth(current, 1);
-  // Nothing has been logged in the future, so forward stops at the current month rather than
-  // offering an endless run of empty grids.
   const atPresent = current >= monthKey(today());
 
   return (
@@ -85,8 +113,6 @@ function Step({ href, label }: { href: string; label: string }) {
     <Link
       href={href}
       className="cap pressable"
-      // 44px of height on a control that only looks 11px tall — the label is small because it
-      // is a caption, but the target is a thumb.
       style={{ color: 'var(--signal)', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 2px' }}
     >
       {label}
@@ -94,34 +120,12 @@ function Step({ href, label }: { href: string; label: string }) {
   );
 }
 
+// --- The grid ----------------------------------------------------------------------------
+
 function Grid({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }) {
   const shape = monthShape(key);
   const byDate = new Map(rows.map((row) => [row.date, row]));
   const now = today();
-
-  // Both bars are scaled to the busiest day IN THIS MONTH, so the grid reads as a comparison
-  // within the month rather than against an all-time maximum that is not on screen.
-  const maxVolume = Math.max(...rows.map((r) => n0(r.volume_lbs)), 1);
-  const maxCalories = Math.max(...rows.map((r) => n0(r.calories)), 1);
-
-  const squares = [
-    ...Array.from({ length: shape.leading }, (_, i) => <span key={`pad${i}`} />),
-    ...Array.from({ length: shape.days }, (_, i) => {
-      const date = `${key}-${String(i + 1).padStart(2, '0')}`;
-      return (
-        <Square
-          key={date}
-          date={date}
-          day={i + 1}
-          row={byDate.get(date)}
-          maxVolume={maxVolume}
-          maxCalories={maxCalories}
-          isToday={date === now}
-          isFuture={date > now}
-        />
-      );
-    }),
-  ];
 
   return (
     <div>
@@ -141,15 +145,31 @@ function Grid({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>{squares}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+        {Array.from({ length: shape.leading }, (_, i) => (
+          <span key={`pad${i}`} />
+        ))}
+        {Array.from({ length: shape.days }, (_, i) => {
+          const date = `${key}-${String(i + 1).padStart(2, '0')}`;
+          return (
+            <Square
+              key={date}
+              date={date}
+              day={i + 1}
+              row={byDate.get(date)}
+              isToday={date === now}
+              isFuture={date > now}
+            />
+          );
+        })}
+      </div>
 
-      <div className="cap" style={{ marginTop: 12, color: 'var(--ink-faint)' }}>
-        <Swatch tone="var(--signal)" />
-        volume
-        <span style={{ marginLeft: 12 }}>
-          <Swatch tone="var(--signal-low)" />
-          calories
-        </span>
+      {/* The legend draws the same marks the squares do rather than describing them in words.
+          Naming the rows in prose ran to two wrapped lines and still left you mapping "top row"
+          onto a 4px tick; showing a lit slot next to its label does not. */}
+      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <LegendRow items={PATTERNS.map((p) => p.label)} tone="var(--signal)" height={4} />
+        <LegendRow items={['Breakfast', 'Lunch', 'Dinner']} tone="var(--signal-low)" height={3} />
       </div>
     </div>
   );
@@ -159,89 +179,66 @@ function Square({
   date,
   day,
   row,
-  maxVolume,
-  maxCalories,
   isToday,
   isFuture,
 }: {
   date: string;
   day: number;
   row?: CalendarRow;
-  maxVolume: number;
-  maxCalories: number;
   isToday: boolean;
   isFuture: boolean;
 }) {
-  const volume = n0(row?.volume_lbs);
-  const calories = n0(row?.calories);
   const hasAnything = Boolean(row);
-
-  // A cardio-only day has no volume but is not a rest day. It gets a minimum mark so it can't
-  // disappear into the same blank as a day off.
-  const volumePct = volume > 0 ? Math.max((volume / maxVolume) * 100, 8) : row?.sets ? 8 : 0;
-  const caloriePct = calories > 0 ? Math.max((calories / maxCalories) * 100, 8) : 0;
+  const patterns = new Set(row?.patterns ?? []);
+  const meals = new Set(row?.meal_types ?? []);
 
   const numberTone = isToday
     ? 'var(--signal)'
-    : isFuture
+    : isFuture || !hasAnything
       ? 'var(--ink-faint)'
-      : hasAnything
-        ? 'var(--ink)'
-        : 'var(--ink-faint)';
-
-  const content = (
-    <>
-      <span className="mono" style={{ fontSize: 'var(--t-sm)', lineHeight: 1, color: numberTone }}>
-        {day}
-      </span>
-      <span style={{ display: 'block' }}>
-        <span
-          className="draw-x"
-          style={
-            {
-              display: 'block',
-              height: 3,
-              width: `${volumePct}%`,
-              background: 'var(--signal)',
-              marginBottom: 2,
-              '--delay': `${day * 8}ms`,
-            } as CSSProperties
-          }
-        />
-        <span
-          className="draw-x"
-          style={
-            {
-              display: 'block',
-              height: 3,
-              width: `${caloriePct}%`,
-              background: 'var(--signal-low)',
-              '--delay': `${day * 8 + 40}ms`,
-            } as CSSProperties
-          }
-        />
-      </span>
-    </>
-  );
+      : 'var(--ink)';
 
   const style: CSSProperties = {
     height: 52,
-    padding: '6px 5px 5px',
+    padding: '5px 5px 6px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    // A background shift marks a day with data. Today gets an outline rather than a top border:
-    // a border on the top edge sits flush against the bottom of the square directly above it in
-    // the grid, so it reads as belonging to the wrong day. `outline` also costs no layout, so
-    // the square doesn't shift by a pixel.
     background: hasAnything && !isFuture ? 'var(--panel)' : 'transparent',
     outline: isToday ? '1px solid var(--signal)' : undefined,
     outlineOffset: -1,
     opacity: isFuture ? 0.35 : 1,
   };
 
-  // A day with nothing on it has nothing to show, so it is not a link. Tapping through to an
-  // empty screen is a worse answer than the square already being blank.
+  const content = (
+    <>
+      <span className="mono" style={{ fontSize: 'var(--t-sm)', lineHeight: 1, color: numberTone }}>
+        {day}
+      </span>
+
+      {/* Slot tracks are drawn only on days that have something. Eight empty tracks on every
+          rest day would fill the month with marks that all mean "no" — the blank square already
+          says that, and says it more clearly. */}
+      {hasAnything ? (
+        <span style={{ display: 'block' }}>
+          <Slots
+            items={PATTERNS.map((p) => patterns.has(p.key))}
+            tone="var(--signal)"
+            height={4}
+            delay={day * 8}
+          />
+          <span style={{ display: 'block', height: 2 }} />
+          <Slots
+            items={MEALS.map((m) => meals.has(m.key))}
+            tone="var(--signal-low)"
+            height={3}
+            delay={day * 8 + 40}
+          />
+        </span>
+      ) : null}
+    </>
+  );
+
   if (!hasAnything) return <span style={style}>{content}</span>;
 
   return (
@@ -250,6 +247,194 @@ function Square({
     </Link>
   );
 }
+
+/** One legend line: a lit slot, then what that position means, in the slots' own order. */
+function LegendRow({ items, tone, height }: { items: readonly string[]; tone: string; height: number }) {
+  return (
+    <div className="cap" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-faint)' }}>
+      <span style={{ display: 'flex', gap: 2, width: 34, flexShrink: 0 }}>
+        {items.map((_, i) => (
+          <span key={i} style={{ flex: 1, height, background: tone }} />
+        ))}
+      </span>
+      <span style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+        {items.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** A fixed row of on/off marks. Unfilled slots keep a faint track so position stays readable. */
+function Slots({
+  items,
+  tone,
+  height,
+  delay,
+}: {
+  items: boolean[];
+  tone: string;
+  height: number;
+  delay: number;
+}) {
+  return (
+    <span style={{ display: 'flex', gap: 2 }}>
+      {items.map((on, i) => (
+        <span
+          key={i}
+          className={on ? 'draw-x' : undefined}
+          style={
+            {
+              flex: 1,
+              height,
+              background: on ? tone : 'var(--rule)',
+              '--delay': `${delay + i * 25}ms`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
+// --- Pattern x day matrix ----------------------------------------------------------------
+
+/**
+ * Every pattern against every day of the month.
+ *
+ * This is the screen's answer to "what am I neglecting". The squares above show what each day
+ * WAS; this shows what each pattern has been getting, read along a row — and a row with a long
+ * empty stretch is visible from across the room in a way that thirty separate squares is not.
+ */
+function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }) {
+  const shape = monthShape(key);
+  const byDate = new Map(rows.map((row) => [row.date, new Set(row.patterns)]));
+  const now = today();
+
+  const days = Array.from({ length: shape.days }, (_, i) => `${key}-${String(i + 1).padStart(2, '0')}`);
+
+  return (
+    <Section label="Coverage" aside="by pattern">
+      <div>
+        {PATTERNS.map((pattern, rowIndex) => {
+          const hits = days.filter((date) => byDate.get(date)?.has(pattern.key)).length;
+          return (
+            <div
+              key={pattern.key}
+              style={{ display: 'grid', gridTemplateColumns: '54px 1fr 26px', alignItems: 'center', gap: 8, height: 20 }}
+            >
+              <span className="cap" style={{ color: hits ? 'var(--ink-dim)' : 'var(--ink-faint)' }}>
+                {pattern.label}
+              </span>
+              <span style={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                {days.map((date, i) => {
+                  const on = byDate.get(date)?.has(pattern.key) ?? false;
+                  const future = date > now;
+                  return (
+                    <span
+                      key={date}
+                      className={on ? 'draw-x' : undefined}
+                      style={
+                        {
+                          flex: 1,
+                          // A trained day is a solid block; an untrained one is a hairline on the
+                          // baseline. Same footprint, so the columns stay aligned with the dates.
+                          height: on ? 12 : 1,
+                          background: on ? 'var(--signal)' : 'var(--rule)',
+                          opacity: future ? 0.3 : 1,
+                          '--delay': `${rowIndex * 60 + i * 6}ms`,
+                        } as CSSProperties
+                      }
+                    />
+                  );
+                })}
+              </span>
+              <span className="mono" style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-faint)', textAlign: 'right' }}>
+                {hits}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Date ruler. Only four labels — one per day would be unreadable at 9px per column, and
+          the point of the row is the shape of the gaps, not reading off exact dates. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '54px 1fr 26px', gap: 8, marginTop: 6 }}>
+        <span />
+        <span className="cap" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--ink-faint)' }}>
+          <span>1</span>
+          <span>8</span>
+          <span>15</span>
+          <span>22</span>
+          <span>{shape.days}</span>
+        </span>
+        <span />
+      </div>
+    </Section>
+  );
+}
+
+// --- Days since --------------------------------------------------------------------------
+
+/**
+ * How long since each pattern was last trained, most overdue first.
+ *
+ * Comes from its own endpoint rather than from the month above, because the month above cannot
+ * answer it: if you last trained pull in June and you are looking at August, nothing in these
+ * rows knows that pull exists.
+ */
+function Recency({ result }: { result: Awaited<ReturnType<typeof getRecency>> }) {
+  if (!result.ok) {
+    return (
+      <Section label="Last trained">
+        <Fault error={result.error} />
+      </Section>
+    );
+  }
+  if (result.rows.length === 0) {
+    return (
+      <Section label="Last trained">
+        <Empty>No sessions recorded yet.</Empty>
+      </Section>
+    );
+  }
+
+  return (
+    <Section label="Last trained" aside="all time">
+      <div style={{ display: 'flex', gap: 10 }}>
+        {result.rows.map((row) => (
+          <Gap key={row.pattern} row={row} />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Gap({ row }: { row: RecencyRow }) {
+  const days = row.days_since;
+  const label = PATTERNS.find((p) => p.key === row.pattern)?.label ?? row.pattern;
+
+  // A week is the threshold, not a judgement about programming: it is simply the point past
+  // which "when did I last do this" stops being obvious without looking it up.
+  const tone = days === null ? 'var(--flag)' : days >= 7 ? 'var(--flag)' : 'var(--ink)';
+
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="cap" style={{ color: 'var(--ink-faint)' }}>
+        {label}
+      </div>
+      <div className="mono" style={{ fontSize: 'var(--t-lg)', marginTop: 2, color: tone }}>
+        {days === null ? '—' : days === 0 ? 'today' : days}
+        {days !== null && days > 0 ? (
+          <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)' }}>d</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// --- Month totals ------------------------------------------------------------------------
 
 function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }) {
   if (rows.length === 0) {
@@ -266,8 +451,6 @@ function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
   const fed = rows.filter((r) => r.items > 0);
   const avgCalories = fed.reduce((sum, r) => sum + n0(r.calories), 0) / (fed.length || 1);
 
-  // First and last actual weigh-ins of the month, not the first and last day — a month that
-  // starts on a Wednesday you didn't weigh in on still has a real change to report.
   const weighed = rows.filter((r) => n(r.weight_lbs) !== null);
   const weightChange =
     weighed.length > 1 ? n0(weighed[weighed.length - 1].weight_lbs) - n0(weighed[0].weight_lbs) : null;
@@ -276,7 +459,6 @@ function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
     <Section label="Month" aside={`${trained.length} training days`}>
       <Figure value={int(volume)} unit="LB VOLUME" count={volume} />
       <div style={{ display: 'flex', gap: 24, marginTop: 16, flexWrap: 'wrap' }}>
-        <Stat label="Sessions" value={String(trained.length)} />
         <Stat label="Cardio" value={dec(cardio, 1)} unit="MI" />
         <Stat label="Avg kcal" value={fed.length ? int(avgCalories) : '—'} />
         <Stat
@@ -286,9 +468,6 @@ function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
           tone={weightChange === null ? undefined : weightChange > 0 ? 'var(--up)' : 'var(--down)'}
         />
       </div>
-      {/* Measured against days ELAPSED, not against the days that happen to have rows. The
-          latter would always read "10/10 days with food logged" — dividing a set by itself —
-          and the number that actually matters is how many days got missed. */}
       <div className="cap" style={{ marginTop: 14, color: 'var(--ink-faint)' }}>
         Food logged {fed.length}/{elapsedDays(key)} days · busiest{' '}
         {compact(Math.max(...rows.map((r) => n0(r.volume_lbs))))} lb

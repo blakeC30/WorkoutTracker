@@ -173,11 +173,24 @@ export type CalendarRow = {
   volume_lbs: Num;
   cardio_mi: Num;
   cardio_min: Num;
+  /** Movement patterns trained that day — what the squares and the matrix are drawn from. */
+  patterns: string[];
   items: number;
   calories: Num;
   protein_g: Num;
+  /** Which meals were logged. Absence here is a hole in logging, not a day without eating. */
+  meal_types: string[];
   weight_lbs: Num;
 };
+
+/** How long since each movement pattern was last trained, longest gap first. */
+export type RecencyRow = {
+  pattern: string;
+  last_date: string | null;
+  days_since: number | null;
+};
+
+export const getRecency = () => query<RecencyRow>('/api/stats/recency');
 
 export type DaySet = {
   set_number: number;

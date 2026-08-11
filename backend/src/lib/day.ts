@@ -34,22 +34,31 @@ export async function getCalendar(from: string, to: string) {
       from generate_series(${from}::date, ${to}::date, interval '1 day') d
     ),
     training as (
+      -- The patterns array is what the calendar squares and the month matrix are drawn from:
+      -- what KIND of session a day was, not how big it was. Volume stays in the payload
+      -- because the month total still reports it, but it is no longer the headline.
       select w.entry_date as date,
              count(distinct w.id)::int      as exercises,
              count(s.id)::int               as sets,
              round(sum(s.reps * s.weight_lbs)) as volume_lbs,
              round(sum(s.distance_mi), 2)   as cardio_mi,
-             round(sum(s.duration_min))     as cardio_min
+             round(sum(s.duration_min))     as cardio_min,
+             array_agg(distinct coalesce(e.pattern, 'other')) as patterns
       from workouts w
+      join exercises e on e.id = w.exercise_id
       join workout_sets s on s.workout_id = w.id
       where w.entry_date between ${from}::date and ${to}::date
       group by 1
     ),
     food as (
+      -- Which meals were logged, not just how many calories. A month view answers "where are
+      -- the holes in my logging" better than it answers "how much did I eat", and a missing
+      -- lunch is invisible in a calorie total.
       select m.entry_date as date,
              count(*)::int                          as items,
              round(sum(f.calories  * m.servings))   as calories,
-             round(sum(f.protein_g * m.servings))   as protein_g
+             round(sum(f.protein_g * m.servings))   as protein_g,
+             array_agg(distinct m.meal_type) filter (where m.meal_type is not null) as meal_types
       from meals m
       join foods f on f.id = m.food_id
       where m.entry_date between ${from}::date and ${to}::date
@@ -64,8 +73,10 @@ export async function getCalendar(from: string, to: string) {
            coalesce(t.exercises, 0) as exercises,
            coalesce(t.sets, 0)      as sets,
            t.volume_lbs, t.cardio_mi, t.cardio_min,
+           coalesce(t.patterns, '{}') as patterns,
            coalesce(f.items, 0)     as items,
            f.calories, f.protein_g,
+           coalesce(f.meal_types, '{}') as meal_types,
            w.weight_lbs
     from days
     left join training t on t.date = days.date
@@ -73,6 +84,42 @@ export async function getCalendar(from: string, to: string) {
     left join weight   w on w.date = days.date
     where t.date is not null or f.date is not null or w.date is not null
     order by days.date`;
+}
+
+/**
+ * When each movement pattern was last trained, and how long ago.
+ *
+ * Deliberately NOT derived from the calendar rows the grid already has. If you last trained
+ * pull in June and you are looking at August, the August rows contain no evidence of it at all
+ * — the answer would come back "never", which is both wrong and the single most alarming thing
+ * the screen could say. This searches the whole history instead.
+ *
+ * Patterns never trained are returned with nulls rather than omitted, because "you have not
+ * done this once" is the most useful answer on the strip, not an absence from it.
+ */
+export async function getPatternRecency() {
+  const sql = getSql();
+
+  return sql`
+    with patterns(pattern) as (
+      values ('push'), ('pull'), ('legs'), ('core'), ('cardio')
+    ),
+    last_done as (
+      select e.pattern, max(w.entry_date) as last_date
+      from workouts w
+      join exercises e on e.id = w.exercise_id
+      where e.pattern is not null
+      group by 1
+    )
+    select p.pattern,
+           l.last_date::text as last_date,
+           case when l.last_date is null then null
+                else ((now() at time zone ${APP_TIMEZONE})::date - l.last_date)::int end as days_since
+    from patterns p
+    left join last_done l on l.pattern = p.pattern
+    -- Longest gap first, never-trained above that: this list is read to decide what to do
+    -- next, so it is ordered by what most needs attention rather than by what is freshest.
+    order by days_since desc nulls first`;
 }
 
 /**

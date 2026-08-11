@@ -45,11 +45,26 @@ Five screens — **Today**, **Week**, **Days**, **Lifts**, **Food** — built fo
 iPhone 13 Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on
 purpose.
 
-**Days** is the calendar: a month grid where each square carries two bars (training volume in
-amber, calories dimmer), tapping through to `/calendar/<date>` for the complete record of that
-day — every set of every exercise, every dish with its portion, and the raw journal text it was
-all parsed from. It is the only screen that shows individual sets or journal text; everywhere
-else is a rollup.
+**Days** is the calendar, and it encodes **kind and presence rather than magnitude** — how much
+you lifted is answered better on Week and Food, while what only a calendar can answer is what
+kind of day this was and when you last did it. Each square carries two fixed-order rows of
+slots: movement patterns on top (push · pull · legs · core · cardio) and the three anchor meals
+below. Position is the encoding, so the palette stays one colour and a leg day has a different
+silhouette from a pull day.
+
+Below the grid, a **coverage matrix** puts every pattern against every day of the month — the
+answer to "what am I neglecting" — and a **last-trained strip** shows days since each pattern,
+most overdue first. That strip has its own endpoint on purpose: if you last trained pull in
+June and you're looking at August, the month's rows contain no evidence pull exists.
+
+Tapping a square opens `/calendar/<date>` with the complete record of that day — every set of
+every exercise, every dish with its portion, and the raw journal text it was parsed from. It is
+the only screen that shows individual sets or journal text; everywhere else is a rollup.
+
+`exercises.pattern` is what all of that groups by, and it deliberately lives on the exercise
+rather than on the muscle: **the pattern is a property of the movement**. A bench press is a
+push even though triceps do real work; a curl is a pull even though it is the same arm.
+Deriving it from muscles puts both in "arms" and gets both wrong.
 
 Two notes on that screen, both consequences of schema rules:
 

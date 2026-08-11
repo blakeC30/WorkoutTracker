@@ -127,7 +127,15 @@ tracking.
 If nothing matches, supply the exercise inline. It's written once and read forever, so take a
 moment over it:
 
-- **`category`** — `strength`, `cardio`, `mobility`, `sport`, or `other`
+- **`category`** — `strength`, `cardio`, `mobility`, `sport`, or `other`. What kind of training
+  this is.
+- **`pattern`** — `push`, `pull`, `legs`, `core`, or `cardio`. What the session *worked*, and
+  what the calendar groups days by.
+
+  This is a property of the **movement**, not of the muscles. Anything pressing away from the
+  body is `push`; anything pulling toward it is `pull`; squats, hinges, and lunges are `legs`.
+  A bench press is `push` even though the triceps work hard, and a curl is `pull` even though
+  it is also an arm — which is exactly why muscle names can't decide this and you have to.
 - **`equipment`** — barbell, dumbbell, machine, cable, bodyweight, bike
 - **`primary_muscles` / `secondary_muscles`** — names from `list_muscles`. Anything else is
   rejected, so check rather than guess. These are what make "which muscles am I neglecting"
