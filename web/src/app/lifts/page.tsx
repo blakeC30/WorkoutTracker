@@ -158,6 +158,12 @@ function EnduranceBody({ row }: { row: PrRow }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <span className="selectable" style={{ fontSize: 'var(--t-base)', lineHeight: 1.2 }}>
           {row.exercise}
+          {/* Read from the row's own pattern rather than assumed from the section. "Cardio &
+              timed" also holds planks, which are Core — so hard-coding green here would put a
+              cardio label on an ab exercise. */}
+          <span className="cap" style={{ color: patternColor(row.pattern), marginLeft: 8 }}>
+            {patternLabel(row.pattern)}
+          </span>
         </span>
         <span className="mono" style={{ fontSize: 'var(--t-lg)', fontWeight: 500, lineHeight: 1 }}>
           {distance !== null ? (
@@ -174,14 +180,27 @@ function EnduranceBody({ row }: { row: PrRow }) {
         </span>
       </div>
 
+      {/* Two groups, each unbreakable: the record on the left, recency on the right. The words
+          "best" and "longest" on every item pushed this past 350px, and with nowrap items the
+          overflow lands mid-phrase — "last 6d" on one line and "ago" on the next. Shorter labels
+          plus wrapping by GROUP means it degrades to two clean lines instead. */}
       <div
         className="mono"
-        style={{ display: 'flex', gap: 12, marginTop: 7, fontSize: 'var(--t-cap)', color: 'var(--ink-faint)' }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginTop: 7,
+          fontSize: 'var(--t-cap)',
+          color: 'var(--ink-faint)',
+        }}
       >
-        {pace !== null ? <span style={{ color: 'var(--ink-dim)' }}>{clock(pace)} /mi best</span> : null}
-        {distance !== null && duration !== null ? <span>{dec(duration, 0)} min longest</span> : null}
-        <span style={{ marginLeft: 'auto' }}>
-          {row.total_sets} sessions · last {agoLabel(row.last_performed).toLowerCase()}
+        <span style={{ whiteSpace: 'nowrap' }}>
+          {pace !== null ? <span style={{ color: 'var(--ink-dim)' }}>best {clock(pace)}/mi</span> : null}
+          {distance !== null && duration !== null ? ` · ${dec(duration, 0)} min` : ''}
+        </span>
+        <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+          {row.total_sets} sessions · {agoLabel(row.last_performed).toLowerCase()}
         </span>
       </div>
     </div>

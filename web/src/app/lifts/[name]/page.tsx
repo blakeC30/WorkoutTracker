@@ -99,19 +99,28 @@ function Progress({ sessions, tone }: { sessions: ExerciseSession[]; tone: strin
     const series = endurance.map((s) => n0(s.distance_mi) || n0(s.duration_min));
     const latest = endurance[endurance.length - 1];
     const best = Math.max(...series, 0);
+    // Distance when it is recorded, minutes otherwise — and the heading names whichever it is.
+    // It previously read "Best effort" above the LATEST session, so a 7.90 mile ride sat under a
+    // heading claiming it was the best while the footer said 11.80 two lines below.
+    const isDistance = n(latest?.distance_mi) !== null;
+    const current = isDistance ? n(latest?.distance_mi) : n(latest?.duration_min);
+
     return (
-      <Section label="Best effort" aside={`${sessions.length} sessions`}>
+      <Section label={isDistance ? 'Distance' : 'Duration'} aside={`${sessions.length} sessions`}>
         <Figure
-          value={dec(n(latest?.distance_mi) ?? n(latest?.duration_min), 2)}
-          unit={n(latest?.distance_mi) !== null ? 'MI' : 'MIN'}
-          count={n(latest?.distance_mi) ?? n(latest?.duration_min)}
+          value={dec(current, 2)}
+          unit={isDistance ? 'MI' : 'MIN'}
+          size="var(--t-3xl)"
+          count={current}
           decimals={2}
+          tone={tone}
         />
         <div style={{ marginTop: 16 }}>
           <Sparkline points={series} height={54} tone={tone} />
         </div>
-        <div className="cap" style={{ marginTop: 10, color: 'var(--ink-faint)' }}>
-          Best {dec(best, 2)} · last {agoLabel(latest.date).toLowerCase()}
+        <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+          <span>Best {dec(best, 2)}</span>
+          <span style={{ color: 'var(--ink-faint)' }}>last {agoLabel(latest.date).toLowerCase()}</span>
         </div>
       </Section>
     );
@@ -167,7 +176,11 @@ function Meta({
         <span style={{ color: tone, borderBottom: `2px solid ${tone}`, paddingBottom: 3 }}>
           {patternLabel(exercise.pattern)}
         </span>
-        {exercise.category ? <span>{exercise.category}</span> : null}
+        {/* Category is suppressed when it just repeats the pattern. A cardio exercise is
+            category "cardio" AND pattern "cardio", which rendered as "Cardio cardio bike". */}
+        {exercise.category && exercise.category !== exercise.pattern ? (
+          <span>{exercise.category}</span>
+        ) : null}
         {exercise.equipment ? <span>{exercise.equipment}</span> : null}
       </div>
       {primary.length > 0 ? (
@@ -246,7 +259,10 @@ function SessionRow({
           className="mono"
           style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 'var(--t-cap)', color: 'var(--ink-faint)' }}
         >
-          {session.set_detail.map((set) => (
+          {/* A single cardio set IS the session, so listing it repeats the headline verbatim —
+              "7.90 mi" above and "7.90mi" directly beneath. Only break out the sets when there
+              is more than one and the breakdown says something the total doesn't. */}
+          {(session.set_detail.length > 1 ? session.set_detail : []).map((set) => (
             <span key={set.set_number}>
               {n(set.weight_lbs) !== null && set.reps !== null
                 ? `${dec(n(set.weight_lbs), 0)}×${set.reps}`
