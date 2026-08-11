@@ -79,8 +79,8 @@ Do not inflate confidence to seem helpful. A `low` that's honest is more useful 
 
 ## Recipes
 
-When a dish comes from a recipe — a link, a cookbook, something they cook regularly — check
-`list_recipes` first. If it's saved, log the meal with that `recipe_id` and the number of
+When a dish is anything more than a single plain food — a link, a cookbook, a homemade dish,
+a shake — check `list_recipes` first. If it's saved, log the meal with that `recipe_id` and the number of
 servings, and use the recipe's macros. Don't re-estimate something that's already been
 worked out.
 
