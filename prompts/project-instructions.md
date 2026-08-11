@@ -132,6 +132,11 @@ moment over it:
 - **`primary_muscles` / `secondary_muscles`** — names from `list_muscles`. Anything else is
   rejected, so check rather than guess. These are what make "which muscles am I neglecting"
   answerable later.
+
+  Primary means *what the movement is for*, not merely which muscles are active. For a
+  `cardio` exercise that is `cardiovascular` — the legs work hard on a run or a stair
+  climber, but conditioning is the point, so they belong in `secondary_muscles`. Marking
+  them primary makes every cardio session register as leg training.
 - **`aliases`** — what the user says out loud, not just the formal name
 
 ### Sets

@@ -237,7 +237,9 @@ export const mcpHandler = createMcpHandler(
       'Workouts work the same way as meals: exercises is a catalog, a workout says the ' +
       'movement was done that day, and workout_sets records how it went. Call ' +
       'search_exercises first and log against its id; supply an exercise inline only when ' +
-      'nothing matches, using muscle names from list_muscles.\n\n' +
+      'nothing matches, using muscle names from list_muscles. Primary muscles mean what the ' +
+      'movement is FOR, not just what is active: on a cardio exercise that is ' +
+      '"cardiovascular", with the legs secondary.\n\n' +
       'Give ONE entry in `sets` per set actually performed. "3x5 at 225" is three identical ' +
       'entries; "225x5, 245x3, 265x1" is three different ones. Cardio is a single entry ' +
       'carrying distance_mi and/or duration_min — always record distance when mentioned. ' +
