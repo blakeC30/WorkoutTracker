@@ -422,8 +422,34 @@ export async function getVolumeByMuscle(days = 28) {
  * Scoped to the same window the screen's chart uses, so the list is what you are eating now
  * rather than everything you have ever logged.
  */
-export async function getFoods(days = 30, limit = 60) {
+export async function getFoods(days = 30, limit = 60, query?: string) {
   const sql = getSql();
+  const q = query?.trim().toLowerCase() ?? '';
+
+  if (!q) {
+    return sql`
+      select f.id, f.name, f.unit_label, f.confidence,
+             f.calories, f.protein_g, f.carbs_g, f.fat_g,
+             count(m.id)::int                    as times_eaten,
+             round(sum(f.calories * m.servings)) as total_calories,
+             max(m.entry_date)::text             as last_eaten
+      from foods f
+      join meals m on m.food_id = f.id
+      where m.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+      group by f.id
+      order by count(m.id) desc, f.name
+      limit ${limit}`;
+  }
+
+  // Searching drops the window on purpose.
+  //
+  // The browse list is "what am I eating lately"; a search is "find me this thing", and the
+  // thing you are hunting for is usually the one you have NOT eaten recently. It also drops
+  // the window because a search that could only see the same rows already on screen would be
+  // a filter wearing a search's clothes — which is exactly the bug this fixes.
+  //
+  // Same matching the MCP tool uses: exact alias, substring, then trigram similarity, all
+  // backed by the gin indexes from migration 004.
   return sql`
     select f.id, f.name, f.unit_label, f.confidence,
            f.calories, f.protein_g, f.carbs_g, f.fat_g,
@@ -432,7 +458,9 @@ export async function getFoods(days = 30, limit = 60) {
            max(m.entry_date)::text             as last_eaten
     from foods f
     join meals m on m.food_id = f.id
-    where m.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+    where lower(f.name) like ${'%' + q + '%'}
+       or ${q} = any (select lower(a) from unnest(f.aliases) a)
+       or similarity(lower(f.name), ${q}) > 0.2
     group by f.id
     order by count(m.id) desc, f.name
     limit ${limit}`;

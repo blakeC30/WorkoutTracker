@@ -344,7 +344,8 @@ export const getBodyweight = (days = 90) => query<BodyweightRow>('/api/stats/bod
 export const getMuscles = (days = 28) => query<MuscleRow>('/api/stats/muscles', { days });
 export const getNutrition = (days = 30) => query<NutritionRow>('/api/stats/nutrition', { days });
 export const getPrs = (limit = 50) => query<PrRow>('/api/stats/prs', { limit });
-export const getFoods = (days = 30, limit = 60) => query<FoodRow>('/api/stats/foods', { days, limit });
+export const getFoods = (days = 30, limit = 60, q?: string) =>
+  query<FoodRow>('/api/stats/foods', q ? { days, limit, q } : { days, limit });
 
 /** Only the flagged ones, all-time. Used for the count on Today. */
 export const getReview = (limit = 25) => query<FoodRow>('/api/stats/review', { limit });

@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import type { FoodRow } from '@/lib/backend';
 import { FoodEditor } from '@/components/FoodEditor';
+import { searchFoods } from '@/app/food/actions';
 import { ListControls, matches, type SortOption } from '@/components/ListControls';
 import { Section, Empty } from '@/components/ui';
 import { n } from '@/lib/num';
@@ -48,11 +49,33 @@ export function isEstimated(row: FoodRow) {
 export function FoodsList({ rows, capped }: { rows: FoodRow[]; capped: boolean }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('often');
+  const [remote, setRemote] = useState<FoodRow[] | null>(null);
+  const [searching, startSearch] = useTransition();
+
+  // Two search paths, and which one runs depends on whether the server sent everything.
+  //
+  // While the list is complete, filtering happens here against rows already in memory: instant,
+  // no request. Once it is capped, a local filter physically cannot see the omitted rows, so the
+  // query goes to the server instead — the whole catalog, fuzzy-matched, window ignored.
+  useEffect(() => {
+    if (!capped || !query.trim()) {
+      setRemote(null);
+      return;
+    }
+    // Debounced so a word typed on a phone keyboard is one query, not eight.
+    const timer = setTimeout(() => {
+      startSearch(async () => setRemote(await searchFoods(query)));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, capped]);
 
   const shown = useMemo(() => {
     const active = SORTS.find((option) => option.key === sort) ?? SORTS[0];
-    return rows.filter((row) => matches(row.name, query)).sort(active.compare);
-  }, [rows, query, sort]);
+    // Server results are NOT filtered again here: it matched on trigram similarity, and a
+    // substring filter would throw away exactly the fuzzy hits that make it worth asking.
+    const source = remote ?? rows.filter((row) => matches(row.name, query));
+    return [...source].sort(active.compare);
+  }, [rows, remote, query, sort]);
 
   const estimated = rows.filter(isEstimated);
 
@@ -76,8 +99,17 @@ export function FoodsList({ rows, capped }: { rows: FoodRow[]; capped: boolean }
         total={rows.length}
       />
 
-      {shown.length === 0 ? (
-        <Empty>Nothing matches “{query.trim()}”.</Empty>
+      {searching ? (
+        <p className="cap" style={{ color: 'var(--ink-faint)', margin: '4px 0 8px' }}>
+          Searching all foods
+        </p>
+      ) : null}
+
+      {shown.length === 0 && !searching ? (
+        <Empty>
+          Nothing matches “{query.trim()}”
+          {capped ? ' anywhere in your foods.' : '.'}
+        </Empty>
       ) : (
         shown.map((row) => <Item key={row.id} row={row} />)
       )}
@@ -85,8 +117,12 @@ export function FoodsList({ rows, capped }: { rows: FoodRow[]; capped: boolean }
       <p style={{ marginTop: 18, color: 'var(--ink-faint)', fontSize: 'var(--t-sm)', lineHeight: 1.5 }}>
         Tap a row to correct its macros. Every past meal using that food moves with it, including
         the days in the chart above.
-        {/* Silent truncation is the one thing a capped list must not do. */}
-        {capped ? ' Only the most-eaten foods are listed — search to reach the rest.' : ''}
+        {/* Silent truncation is the one thing a capped list must not do — and the claim has to
+            be true, which is why searching a capped list queries the server rather than
+            filtering what is already on screen. */}
+        {capped
+          ? ' Showing your most-eaten foods; searching looks through all of them, not just these.'
+          : ''}
       </p>
     </Section>
   );

@@ -19,6 +19,45 @@ import { int } from '@/lib/format';
  */
 export function FoodEditor({ row, children }: { row: FoodRow; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+
+  // The form — and its useActionState — only exists once opened.
+  //
+  // This used to be one component, which meant every row on the screen mounted an action-state
+  // hook it would probably never use. At a dozen foods that is invisible; at a few hundred it is
+  // hundreds of hooks to hydrate for one row you might tap. A collapsed row is now just a button.
+  //
+  // The ROW is that button, rather than an amber call-to-action under each one: a stack of those
+  // competed with the ordering that tells you which food is worth fixing, and the row is a far
+  // bigger tap target than any control that would fit there.
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="pressable"
+        aria-label={`Correct macros for ${row.name}`}
+        style={{ display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <EditForm row={row} onClose={() => setOpen(false)}>
+      {children}
+    </EditForm>
+  );
+}
+
+function EditForm({
+  row,
+  children,
+  onClose,
+}: {
+  row: FoodRow;
+  children: ReactNode;
+  onClose: () => void;
+}) {
   const [state, action, pending] = useActionState<SaveState, FormData>(saveFoodMacros, {
     status: 'idle',
   });
@@ -31,23 +70,7 @@ export function FoodEditor({ row, children }: { row: FoodRow; children: ReactNod
     setSeenStatus(state.status);
     // No confirmation banner: revalidation re-renders the row from the database, so the new
     // numbers appearing above ARE the confirmation.
-    if (state.status === 'saved') setOpen(false);
-  }
-
-  // The ROW is the button, rather than an amber call-to-action under each one. Eleven of those
-  // stacked down the page competed with the ranking that tells you which food is actually worth
-  // fixing — and the row is a far bigger tap target than any control that would fit here.
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="pressable"
-        aria-label={`Correct macros for ${row.name}`}
-        style={{ display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer' }}
-      >
-        {children}
-      </button>
-    );
+    if (state.status === 'saved') onClose();
   }
 
   return (
@@ -91,7 +114,7 @@ export function FoodEditor({ row, children }: { row: FoodRow; children: ReactNod
         </button>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
           className="cap pressable"
           style={{ minHeight: 44, padding: '0 14px', color: 'var(--ink-faint)' }}
         >

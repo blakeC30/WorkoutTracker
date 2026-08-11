@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { updateFood } from '@/lib/backend';
+import { getFoods, updateFood, type FoodRow } from '@/lib/backend';
 
 /**
  * The dashboard's only write.
@@ -51,4 +51,24 @@ export async function saveFoodMacros(_previous: SaveState, form: FormData): Prom
   revalidatePath('/');
   revalidatePath('/calendar', 'layout');
   return { status: 'saved' };
+}
+
+
+/**
+ * Search the whole food catalog, for when the browsed list is capped.
+ *
+ * The list normally filters in the browser against rows already sent, which is instant. That
+ * only works while the server sent everything — once the list is truncated, a client-side
+ * filter cannot reach the rows that were omitted, and telling the user to "search to reach the
+ * rest" would be false. This is the path that makes it true.
+ *
+ * Runs the same trigram search the logging tools use, so a misspelling still lands, and ignores
+ * the 30-day window because the food you are hunting for is usually one you have not eaten
+ * lately.
+ */
+export async function searchFoods(query: string): Promise<FoodRow[]> {
+  const term = query.trim();
+  if (!term) return [];
+  const result = await getFoods(30, 60, term);
+  return result.ok ? result.rows : [];
 }
