@@ -197,6 +197,17 @@ button {
   outline-offset: 2px;
 }
 
+/* Recharts marks every internal layer tabindex="-1" even with its accessibility layer off.
+ * Those elements cannot be reached by keyboard, so a focus ring on one is never an affordance —
+ * it is a touch artefact, and it drew amber boxes around the chart the moment you put a finger
+ * on it. Scoped to the chart and to non-tabbable elements only, so a real focus indicator
+ * anywhere else is untouched. */
+.chart-in [tabindex='-1']:focus,
+.chart-in [tabindex='-1']:focus-visible,
+.chart-in svg:focus {
+  outline: none;
+}
+
 /* --- Motion ----------------------------------------------------------------------------
  *
  * Everything here animates transform, opacity, or an SVG dash offset. No animation touches

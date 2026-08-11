@@ -150,7 +150,22 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
         }}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 6, bottom: 0, left: 6 }}>
+          <ComposedChart
+            data={data}
+            margin={{ top: 8, right: 6, bottom: 0, left: 6 }}
+            // Recharts 3 ships an accessibility layer by default: it puts role="application"
+            // and tabindex="0" on the SVG surface and tabindex="-1" on every internal layer.
+            // Touching the chart focuses those, and the app's global focus ring then paints
+            // amber boxes around the surface and its layers — which is what you see when you
+            // put a finger on it.
+            //
+            // Off, because it is redundant here rather than merely inconvenient. It exists to
+            // give keyboard and screen-reader users a way into the chart, and this app has its
+            // own: the date, calories and macros for the selected day are real DOM text above
+            // the plot, not values locked inside the SVG. The chart draws the shape; the
+            // numbers are already readable without it.
+            accessibilityLayer={false}
+          >
             {/* Both axes exist for scaling; only the date axis is drawn. Gridlines are the
                 reference line below and nothing else — a grid of boxes is a chart cliché that
                 adds ink without adding a reading. */}
