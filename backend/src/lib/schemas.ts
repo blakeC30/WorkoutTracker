@@ -42,6 +42,14 @@ export const workoutInput = z.object({
   reps: z.number().int().positive().optional().describe('Reps per set, not total reps.'),
   weight_lbs: z.number().nonnegative().optional().describe('Omit for bodyweight work.'),
   duration_min: z.number().nonnegative().optional().describe('For cardio or timed work.'),
+  distance_mi: z
+    .number()
+    .nonnegative()
+    .optional()
+    .describe(
+      'Distance in miles, for running, walking, rowing, cycling. Always record this when ' +
+        'the user mentions a distance — it is the main measure of cardio volume.',
+    ),
   rpe: z.number().min(1).max(10).optional().describe('Rate of perceived exertion, 1-10.'),
   notes: z.string().optional(),
 });

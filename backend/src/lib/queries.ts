@@ -2,6 +2,7 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
 import { getSql } from './db';
 import { getEnv } from './env';
+import { APP_TIMEZONE } from './time';
 import type { LogEntryInput } from './schemas';
 
 // Node has no global WebSocket until v22, and Pool talks to Neon over one.
@@ -71,8 +72,8 @@ export async function logEntry(
       const { rows } = await client.query<{ inserted: boolean }>(
         `insert into workouts
            (journal_id, entry_date, exercise, category, sets, reps,
-            weight_lbs, duration_min, rpe, notes)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            weight_lbs, duration_min, distance_mi, rpe, notes)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          on conflict (entry_date, exercise) do update set
            journal_id   = excluded.journal_id,
            category     = coalesce(excluded.category,     workouts.category),
@@ -80,13 +81,14 @@ export async function logEntry(
            reps         = coalesce(excluded.reps,         workouts.reps),
            weight_lbs   = coalesce(excluded.weight_lbs,   workouts.weight_lbs),
            duration_min = coalesce(excluded.duration_min, workouts.duration_min),
+           distance_mi  = coalesce(excluded.distance_mi,  workouts.distance_mi),
            rpe          = coalesce(excluded.rpe,          workouts.rpe),
            notes        = coalesce(excluded.notes,        workouts.notes)
          returning (xmax = 0) as inserted`,
         [
           journalId, w.entry_date, w.exercise, w.category ?? null, w.sets ?? null,
           w.reps ?? null, w.weight_lbs ?? null, w.duration_min ?? null,
-          w.rpe ?? null, w.notes ?? null,
+          w.distance_mi ?? null, w.rpe ?? null, w.notes ?? null,
         ],
       );
       workouts.push({
@@ -143,17 +145,17 @@ export async function getRecentHistory(days: number) {
 
   const [workouts, bodyweight, meals] = await Promise.all([
     sql`select entry_date::text as entry_date, exercise, category, sets, reps, weight_lbs,
-               duration_min, rpe, notes
+               duration_min, distance_mi, rpe, notes
         from workouts
-        where entry_date >= current_date - ${days}::int
+        where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc, exercise asc`,
     sql`select entry_date::text as entry_date, weight_lbs, notes
         from bodyweight
-        where entry_date >= current_date - ${days}::int
+        where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc`,
     sql`select entry_date::text as entry_date, description, calories, protein_g, carbs_g, fat_g, confidence
         from meals
-        where entry_date >= current_date - ${days}::int
+        where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc`,
   ]);
 
@@ -166,10 +168,10 @@ export async function getJournal(startDate: string, endDate: string) {
   // journal was WRITTEN. That's the point of this tool — reading back what you typed.
   const entries = await sql`
     select id, raw_text, source,
-           to_char(created_at, 'YYYY-MM-DD HH24:MI') as created_at
+           to_char(created_at at time zone ${APP_TIMEZONE}, 'YYYY-MM-DD HH24:MI') as created_at
     from journals
-    where created_at >= ${startDate}::date
-      and created_at < (${endDate}::date + 1)
+    where (created_at at time zone ${APP_TIMEZONE})::date >= ${startDate}::date
+      and (created_at at time zone ${APP_TIMEZONE})::date <= ${endDate}::date
     order by created_at asc`;
   return { start_date: startDate, end_date: endDate, entries };
 }
@@ -180,12 +182,13 @@ export async function describeJournal(journalId: number) {
 
   const [journal] = await sql`
     select id, raw_text, source,
-           to_char(created_at, 'YYYY-MM-DD HH24:MI') as created_at
+           to_char(created_at at time zone ${APP_TIMEZONE}, 'YYYY-MM-DD HH24:MI') as created_at
     from journals where id = ${journalId}`;
   if (!journal) return null;
 
   const [workouts, bodyweight, meals] = await Promise.all([
-    sql`select entry_date::text as entry_date, exercise, sets, reps, weight_lbs, duration_min
+    sql`select entry_date::text as entry_date, exercise, sets, reps, weight_lbs,
+               duration_min, distance_mi
         from workouts where journal_id = ${journalId} order by exercise`,
     sql`select entry_date::text as entry_date, weight_lbs from bodyweight where journal_id = ${journalId}`,
     sql`select entry_date::text as entry_date, description, calories
