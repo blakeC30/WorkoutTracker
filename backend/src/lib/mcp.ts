@@ -2,13 +2,16 @@ import { z } from 'zod';
 import { createMcpHandler } from 'mcp-handler';
 import {
   getJournalInput,
+  getPrsInput,
   getRecentHistoryInput,
+  getWeeklySummaryInput,
   searchExercisesInput,
   searchFoodsInput,
   logEntryInput,
   saveFoodInput,
   undoEntryInput,
 } from './schemas';
+import { getPrs, getVolumeByMuscle, getWeeklySummary } from './stats';
 import {
   deleteJournal,
   describeJournal,
@@ -149,6 +152,51 @@ export const mcpHandler = createMcpHandler(
       },
     );
     server.registerTool(
+      'get_prs',
+      {
+        title: 'Personal records',
+        description:
+          'Best lifts per exercise: the heaviest set, and the best estimated one-rep max ' +
+          '(Epley). Both are reported because they answer different questions — adding reps ' +
+          'at the same weight raises the estimated max without touching the heaviest set, ' +
+          'and that is most of what progress looks like. Sets above 12 reps are excluded, ' +
+          'where the estimate stops meaning anything.',
+        inputSchema: getPrsInput,
+      },
+      async ({ exercise, limit }) => json(await getPrs({ exercise, limit })),
+    );
+
+    server.registerTool(
+      'get_weekly_summary',
+      {
+        title: 'Week-by-week summary',
+        description:
+          'Training days, sets, volume, cardio, average RPE, average calories and protein, ' +
+          'and average bodyweight, per week. Weeks with no training appear with zeros ' +
+          'rather than being skipped, so gaps are visible. Use this before commenting on ' +
+          'trends or consistency — it is the difference between reading the data and ' +
+          'guessing at it.',
+        inputSchema: getWeeklySummaryInput,
+      },
+      async ({ weeks }) => json(await getWeeklySummary(weeks ?? 8)),
+    );
+
+    server.registerTool(
+      'get_volume_by_muscle',
+      {
+        title: 'Training volume by muscle region',
+        description:
+          'Volume attributed to each muscle region over a window, for spotting what is ' +
+          'being neglected. Volume is summed per session before being attributed, so an ' +
+          'exercise naming several muscles in one region is not counted twice.',
+        inputSchema: z.object({
+          days: z.number().int().positive().max(365).default(28).optional(),
+        }),
+      },
+      async ({ days }) => json(await getVolumeByMuscle(days ?? 28)),
+    );
+
+    server.registerTool(
       'search_exercises',
       {
         title: 'Search the exercise catalog',
@@ -211,7 +259,7 @@ export const mcpHandler = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: 'workout-tracker', version: '0.5.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.6.0' },
     instructions:
       'Personal fitness tracker for a single user. When they describe training, food or ' +
       'bodyweight, parse it and call log_entry with both the raw text and the structured ' +

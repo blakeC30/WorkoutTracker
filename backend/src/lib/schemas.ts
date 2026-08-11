@@ -277,3 +277,16 @@ export const searchExercisesInput = z.object({
 export const saveExerciseInput = inlineExercise.extend({
   exercise_id: z.number().int().positive().optional().describe('Existing exercise to update.'),
 });
+
+export const getPrsInput = z.object({
+  exercise: z
+    .string()
+    .optional()
+    .describe('Filter to exercises matching this text. Omit for all of them.'),
+  limit: z.number().int().positive().max(100).default(25).optional(),
+});
+
+export const getWeeklySummaryInput = z.object({
+  weeks: z.number().int().positive().max(52).default(8).optional()
+    .describe('How many weeks back to summarize.'),
+});
