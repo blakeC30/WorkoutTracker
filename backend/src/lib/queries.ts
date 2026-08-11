@@ -119,10 +119,12 @@ export async function logEntry(
       // No uniqueness constraint on meals — several meals a day is normal.
       await client.query(
         `insert into meals
-           (journal_id, entry_date, description, calories, protein_g, carbs_g, fat_g, confidence)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           (journal_id, entry_date, meal_type, description, recipe_id, servings,
+            calories, protein_g, carbs_g, fat_g, confidence)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
-          journalId, m.entry_date, m.description, m.calories ?? null,
+          journalId, m.entry_date, m.meal_type ?? null, m.description,
+          m.recipe_id ?? null, m.servings ?? null, m.calories ?? null,
           m.protein_g ?? null, m.carbs_g ?? null, m.fat_g ?? null,
           m.confidence ?? null,
         ],
@@ -153,7 +155,8 @@ export async function getRecentHistory(days: number) {
         from bodyweight
         where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc`,
-    sql`select entry_date::text as entry_date, description, calories, protein_g, carbs_g, fat_g, confidence
+    sql`select entry_date::text as entry_date, meal_type, description, recipe_id, servings,
+               calories, protein_g, carbs_g, fat_g, confidence
         from meals
         where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
         order by entry_date desc`,
@@ -191,7 +194,7 @@ export async function describeJournal(journalId: number) {
                duration_min, distance_mi
         from workouts where journal_id = ${journalId} order by exercise`,
     sql`select entry_date::text as entry_date, weight_lbs from bodyweight where journal_id = ${journalId}`,
-    sql`select entry_date::text as entry_date, description, calories
+    sql`select entry_date::text as entry_date, meal_type, description, calories
         from meals where journal_id = ${journalId} order by id`,
   ]);
 
@@ -203,4 +206,53 @@ export async function deleteJournal(journalId: number): Promise<boolean> {
   const sql = getSql();
   const rows = await sql`delete from journals where id = ${journalId} returning id`;
   return rows.length > 0;
+}
+
+/**
+ * Saves a recipe, or updates it if the name already exists.
+ *
+ * Macros stored here are PER SERVING. They are copied onto a meal row when the meal is
+ * logged and never read back through the link — refining a recipe changes what gets logged
+ * next, not what was already eaten.
+ */
+export async function saveRecipe(input: {
+  name: string;
+  source_url?: string;
+  servings?: number;
+  calories?: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+  notes?: string;
+}) {
+  const sql = getSql();
+  const name = input.name.trim();
+
+  const [row] = await sql`
+    insert into recipes (name, source_url, servings, calories, protein_g, carbs_g, fat_g, notes)
+    values (${name}, ${input.source_url ?? null}, ${input.servings ?? null},
+            ${input.calories ?? null}, ${input.protein_g ?? null},
+            ${input.carbs_g ?? null}, ${input.fat_g ?? null}, ${input.notes ?? null})
+    on conflict (name) do update set
+      source_url = coalesce(excluded.source_url, recipes.source_url),
+      servings   = coalesce(excluded.servings,   recipes.servings),
+      calories   = coalesce(excluded.calories,   recipes.calories),
+      protein_g  = coalesce(excluded.protein_g,  recipes.protein_g),
+      carbs_g    = coalesce(excluded.carbs_g,    recipes.carbs_g),
+      fat_g      = coalesce(excluded.fat_g,      recipes.fat_g),
+      notes      = coalesce(excluded.notes,      recipes.notes),
+      updated_at = now()
+    returning id, name, (xmax = 0) as created`;
+
+  return { id: Number(row.id), name: row.name as string, created: row.created as boolean };
+}
+
+export async function listRecipes(search?: string) {
+  const sql = getSql();
+  const term = search ? `%${search.trim().toLowerCase()}%` : '%';
+  return sql`
+    select id, name, source_url, servings, calories, protein_g, carbs_g, fat_g, notes
+    from recipes
+    where lower(name) like ${term}
+    order by name`;
 }

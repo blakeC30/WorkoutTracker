@@ -2,7 +2,9 @@ import { createMcpHandler } from 'mcp-handler';
 import {
   getJournalInput,
   getRecentHistoryInput,
+  listRecipesInput,
   logEntryInput,
+  saveRecipeInput,
   undoEntryInput,
 } from './schemas';
 import {
@@ -10,7 +12,9 @@ import {
   describeJournal,
   getJournal,
   getRecentHistory,
+  listRecipes,
   logEntry,
+  saveRecipe,
 } from './queries';
 
 /** Every tool returns text; this keeps the shape consistent. */
@@ -131,13 +135,53 @@ export const mcpHandler = createMcpHandler(
         return text(`Deleted:\n\n${lines.join('\n')}`);
       },
     );
+    server.registerTool(
+      'save_recipe',
+      {
+        title: 'Save or update a recipe',
+        description:
+          'Store a recipe so its macros never have to be estimated again. Macros are PER ' +
+          'SERVING, not per batch. Saving a name that already exists updates it. Meals ' +
+          'already logged from this recipe keep the macros they were logged with — ' +
+          'refining a recipe changes what gets logged next, not what was already eaten.',
+        inputSchema: saveRecipeInput,
+      },
+      async (input) => {
+        const r = await saveRecipe(input);
+        return text(
+          `${r.created ? 'Saved' : 'Updated'} recipe #${r.id} "${r.name}". ` +
+            `Log meals from it with recipe_id ${r.id} and the number of servings eaten.`,
+        );
+      },
+    );
+
+    server.registerTool(
+      'list_recipes',
+      {
+        title: 'List saved recipes',
+        description:
+          'Look up saved recipes and their per-serving macros. Check here BEFORE estimating ' +
+          'macros for a dish — if it is already saved, use its numbers and recipe_id rather ' +
+          'than guessing again.',
+        inputSchema: listRecipesInput,
+      },
+      async ({ search }) => json(await listRecipes(search)),
+    );
   },
   {
-    serverInfo: { name: 'workout-tracker', version: '0.1.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.2.0' },
     instructions:
       'Personal fitness tracker for a single user. When they describe training, food or ' +
       'bodyweight, parse it and call log_entry with both the raw text and the structured ' +
-      'data. Pay attention to when things happened: "yesterday I squatted" is a workout ' +
-      'dated yesterday, not today.',
+      'data.\n\n' +
+      'Dates are when things HAPPENED: "yesterday I squatted" is a workout dated yesterday, ' +
+      'not today.\n\n' +
+      'Log one meal row per COMPONENT, not per meal. A dinner of cod, green beans, rice and ' +
+      'salad is four rows sharing an entry_date and meal_type — never one lumped row. Set ' +
+      'meal_type on every meal row.\n\n' +
+      'Before estimating macros for a dish, call list_recipes. If it is saved, use its ' +
+      'macros and recipe_id instead of guessing. If a dish looks like it will recur, offer ' +
+      'to save_recipe it.\n\n' +
+      'For cardio, always record distance_mi when a distance is mentioned.',
   },
 );

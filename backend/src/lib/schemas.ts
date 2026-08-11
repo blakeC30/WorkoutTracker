@@ -62,7 +62,28 @@ export const bodyweightInput = z.object({
 
 export const mealInput = z.object({
   entry_date: entryDate,
-  description: z.string().min(1),
+  meal_type: z
+    .enum(['breakfast', 'lunch', 'dinner', 'snack', 'dessert'])
+    .optional()
+    .describe('Which meal this belongs to. Set it on every meal row.'),
+  description: z
+    .string()
+    .min(1)
+    .describe(
+      'ONE component, not a whole meal. A dinner of cod, green beans, rice and salad is ' +
+        'four separate meal rows sharing an entry_date and meal_type — never one lumped row.',
+    ),
+  recipe_id: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('If this came from a saved recipe, its id from list_recipes.'),
+  servings: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Servings eaten, when logging from a recipe. Recipe macros are per serving.'),
   calories: z.number().int().nonnegative().optional(),
   protein_g: z.number().int().nonnegative().optional(),
   carbs_g: z.number().int().nonnegative().optional(),
@@ -123,3 +144,21 @@ export type WorkoutInput = z.infer<typeof workoutInput>;
 export type BodyweightInput = z.infer<typeof bodyweightInput>;
 export type MealInput = z.infer<typeof mealInput>;
 export type LogEntryInput = z.infer<typeof logEntryInput>;
+
+export const saveRecipeInput = z.object({
+  name: z.string().min(1).describe('Short identifying name, e.g. "miso black cod".'),
+  source_url: z.string().optional().describe('Where the recipe came from, if anywhere.'),
+  servings: z.number().positive().optional().describe('How many servings the recipe yields.'),
+  calories: z.number().int().nonnegative().optional().describe('PER SERVING, not per batch.'),
+  protein_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+  carbs_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+  fat_g: z.number().int().nonnegative().optional().describe('Per serving.'),
+  notes: z.string().optional(),
+});
+
+export const listRecipesInput = z.object({
+  search: z
+    .string()
+    .optional()
+    .describe('Optional substring to filter by name. Omit to list everything.'),
+});
