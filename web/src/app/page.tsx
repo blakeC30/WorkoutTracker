@@ -64,25 +64,24 @@ export default async function Today() {
 // --- Sections ---------------------------------------------------------------------------
 
 /**
- * How much of the log rests on estimated macros.
+ * How many foods are still running on estimated macros.
  *
  * Built like every other block on this screen — a Section label, one mono figure, a caption —
  * rather than the lone sans-serif list row it used to be, which was the only thing on Today
  * that did not look like the rest of the app.
- *
- * The figure is the calories affected rather than the count of foods, because that is the
- * number that says whether this is worth an afternoon: eleven foods could be eleven kcal or
- * fifty thousand. The count moves to the aside, where every other section keeps its "how many".
  */
 function Review({ rows }: { rows: ReviewRow[] }) {
-  const affected = rows.reduce((sum, row) => sum + n0(row.total_calories), 0);
-
   return (
     <Link href="/food" className="pressable" style={{ display: 'block' }}>
-      <Section label="Needs review" aside={`${rows.length} foods`}>
+      <Section label="Needs review">
         {/* --flag, not the pattern palette: this is the app's established "estimated, needs
             fixing" colour, the same one the review queue and low-confidence dishes use. */}
-        <Figure value={int(affected)} unit="KCAL AFFECTED" count={affected} tone="var(--flag)" />
+        <Figure
+          value={String(rows.length)}
+          unit={rows.length === 1 ? 'FOOD' : 'FOODS'}
+          count={rows.length}
+          tone="var(--flag)"
+        />
         <div className="cap" style={{ marginTop: 12, color: 'var(--ink-faint)' }}>
           Tap to correct their macros
         </div>

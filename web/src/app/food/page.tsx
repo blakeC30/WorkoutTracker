@@ -1,4 +1,4 @@
-import { getNutrition, getReview, n, n0, type ReviewRow } from '@/lib/backend';
+import { getNutrition, getReview, n, type ReviewRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { NutritionChart } from '@/components/NutritionChart';
 import { FoodEditor } from '@/components/FoodEditor';
@@ -61,10 +61,8 @@ function Review({ result }: { result: Awaited<ReturnType<typeof getReview>> }) {
     );
   }
 
-  const contested = result.rows.reduce((sum, r) => sum + n0(r.total_calories), 0);
-
   return (
-    <Section label="Needs review" aside={`${int(contested)} kcal affected`}>
+    <Section label="Needs review" aside={`${result.rows.length} foods`}>
       {result.rows.map((row) => (
         <Item key={row.id} row={row} />
       ))}
