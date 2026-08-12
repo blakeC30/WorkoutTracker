@@ -105,8 +105,6 @@ export type { Num };
 export type BodyweightRow = {
   date: string;
   weight_lbs: Num;
-  rolling_7d: Num;
-  days_in_window: number;
 };
 
 export type MuscleRow = {

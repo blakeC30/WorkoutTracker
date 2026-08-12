@@ -34,6 +34,9 @@ export type LogEntryResult = {
     entry_date: string;
     updated: boolean;
     setCount: number;
+    /** Sets that already existed for this exercise on this date and were thrown away. */
+    setsReplaced: number;
+    appended: boolean;
     exerciseAdded: boolean;
   }>;
   bodyweight: { entry_date: string; weight_lbs: number } | null;
@@ -157,11 +160,39 @@ export async function logEntry(
       );
       const workoutId = Number(wrows[0].id);
 
-      // Sets are REPLACED, not appended. Re-logging a day's squats means the new list is
-      // what happened — appending would silently double the volume of a correction.
+      /*
+       * Replacing is the default because a re-log is usually a correction, and appending a
+       * correction doubles the day's volume.
+       *
+       * But it is destructive, and it used to be the ONLY behaviour: a second session, a second
+       * walk, or an afterthought — "I forgot, I also did two more sets" — silently deleted the
+       * sets already stored, leaving the journal text as the only surviving record of them.
+       * `set_mode: 'append'` is the way to say "this is more work, not a restatement".
+       *
+       * Whichever mode ran, how many rows it destroyed is reported back, so a replace the user
+       * did not intend is visible in the confirmation instead of three weeks later in a chart.
+       */
+      let setsReplaced = 0;
       if (w.sets && w.sets.length > 0) {
-        await client.query('delete from workout_sets where workout_id = $1', [workoutId]);
-        let n = 0;
+        let firstSetNumber = 1;
+
+        if (w.set_mode === 'append') {
+          // Continue the day's numbering rather than restarting it, or the second session's
+          // sets collide with the first's and the order they were performed in is lost.
+          const { rows: maxRows } = await client.query<{ last: number }>(
+            'select coalesce(max(set_number), 0)::int as last from workout_sets where workout_id = $1',
+            [workoutId],
+          );
+          firstSetNumber = maxRows[0].last + 1;
+        } else {
+          const deleted = await client.query(
+            'delete from workout_sets where workout_id = $1',
+            [workoutId],
+          );
+          setsReplaced = deleted.rowCount ?? 0;
+        }
+
+        let n = firstSetNumber - 1;
         for (const s of w.sets) {
           n += 1;
           await client.query(
@@ -181,6 +212,8 @@ export async function logEntry(
         entry_date: w.entry_date,
         updated: !wrows[0].inserted,
         setCount: w.sets?.length ?? 0,
+        setsReplaced,
+        appended: w.set_mode === 'append',
         exerciseAdded: savedExercise?.created ?? false,
       });
     }

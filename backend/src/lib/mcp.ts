@@ -72,8 +72,17 @@ export const mcpHandler = createMcpHandler(
         for (const w of result.workouts) {
           const sets = w.setCount === 1 ? '1 set' : `${w.setCount} sets`;
           const added = w.exerciseAdded ? ' [new exercise]' : '';
+          // A replace that destroyed existing sets is stated outright, because it is the one
+          // outcome here that loses data and the one the user may not have meant. Silence made
+          // an accidental overwrite indistinguishable from an ordinary log.
+          const fate = w.appended
+            ? ' [appended to what was already logged]'
+            : w.setsReplaced > 0
+              ? ` [REPLACED ${w.setsReplaced} set(s) already logged for this exercise on this ` +
+                `date — if that was meant to be additional work, re-log with set_mode: "append"]`
+              : '';
           lines.push(
-            `  ${w.updated ? 'Updated' : 'Logged'} ${w.exercise}, ${sets} on ${w.entry_date}${added}`,
+            `  ${w.updated ? 'Updated' : 'Logged'} ${w.exercise}, ${sets} on ${w.entry_date}${added}${fate}`,
           );
         }
         if (result.bodyweight) {
@@ -398,7 +407,7 @@ export const mcpHandler = createMcpHandler(
     // around fields it cannot see. This string is the only way to tell from a running
     // conversation which vintage the client is actually holding: ask it what the server version
     // is, and if it disagrees with what is deployed, the connector needs removing and re-adding.
-    serverInfo: { name: 'workout-tracker', version: '0.8.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.9.0' },
 
     /*
      * These instructions are sent on every connection, and they are the layer that has to
@@ -473,9 +482,18 @@ export const mcpHandler = createMcpHandler(
       'SETS: give ONE entry per set actually performed. "3x5 at 225" is three identical ' +
       'entries; "225x5, 245x3, 265x1" is three different ones — flattening a ramp to one ' +
       'number destroys both the PR and the volume. Cardio is a single entry carrying ' +
-      'distance_mi and/or duration_min; always record distance when one is mentioned. ' +
-      'Re-logging an exercise on a day REPLACES that day\'s sets, so a correction must carry ' +
-      'the full list, not only the set that changed.\n\n' +
+      'distance_mi and/or duration_min; always record distance when one is mentioned.\n\n' +
+
+      'RE-LOGGING an exercise that already has sets on that date is governed by set_mode, and ' +
+      'it is the one field here that can destroy data. The default, "replace", throws away ' +
+      'what is stored and keeps what you send — so a correction must carry the FULL list, not ' +
+      'only the set that changed. Send "append" whenever the new sets are additional work ' +
+      'rather than a restatement: a second session or second walk the same day, or an ' +
+      'afterthought like "I forgot, I also did two more sets". Decide from what the user ' +
+      'actually said; when it is genuinely unclear whether they are correcting or adding, ask ' +
+      'rather than guessing, because a wrong "replace" leaves no trace outside the journal ' +
+      'text. The tool reports how many sets a replace destroyed — if that count is a surprise, ' +
+      'say so to the user immediately.\n\n' +
 
       'RPE is optional and usually absent. Record it only when the user actually says how ' +
       'hard something felt. NEVER estimate it — it is a report of how the lifter felt, so it ' +

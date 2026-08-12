@@ -232,6 +232,13 @@ slots: movement patterns on top (push · pull · legs · core · cardio) and the
 below. Position is the encoding, so the palette stays one colour and a leg day has a different
 silhouette from a pull day.
 
+A weigh-in is the one thing on a square that is **not** a slot — a small mark beside the date
+instead. The rows say what you *did*; a weigh-in is a measurement you took, with no pattern, no
+meal, and no position to hold in a fixed sequence. It also keeps the slot rows at five and three,
+which is the only reason they stay readable at 6px. The number itself is never shown there: a
+weight in a 48px box is a magnitude with nothing beside it to compare against, and the day page
+and Today's chart both already answer that.
+
 Below the grid, a **coverage matrix** puts every pattern against every day of the month — the
 answer to "what am I neglecting" — and a **last-trained strip** shows days since each pattern,
 most overdue first. That strip has its own endpoint on purpose: if you last trained pull in

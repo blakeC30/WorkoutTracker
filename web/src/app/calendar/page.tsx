@@ -167,6 +167,14 @@ function Grid({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }
           items={MEALS.map((m) => ({ label: m.long, tone: 'var(--ink-faint)' }))}
           height={3}
         />
+        {/* Written out rather than passed through LegendRow: that draws a strip of slots across
+            the full 34px, and the whole point of this mark is that it is not a slot. */}
+        <div className="cap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ display: 'flex', alignItems: 'center', width: 34, flexShrink: 0 }}>
+            <WeighMark />
+          </span>
+          <span style={{ color: 'var(--ink-dim)' }}>Weighed in</span>
+        </div>
       </div>
     </div>
   );
@@ -188,6 +196,7 @@ function Square({
   const hasAnything = Boolean(row);
   const patterns = new Set(row?.patterns ?? []);
   const meals = new Set(row?.meal_types ?? []);
+  const weighed = n(row?.weight_lbs) !== null;
 
   const numberTone = isToday
     ? 'var(--signal)'
@@ -209,8 +218,16 @@ function Square({
 
   const content = (
     <>
-      <span className="mono" style={{ fontSize: 'var(--t-sm)', lineHeight: 1, color: numberTone }}>
-        {day}
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 3 }}>
+        <span className="mono" style={{ fontSize: 'var(--t-sm)', lineHeight: 1, color: numberTone }}>
+          {day}
+        </span>
+        {/* Sits on the date line rather than in a third slot row, because it is a different kind
+            of fact. The two rows below say what you DID; a weigh-in is a measurement you took,
+            and it has no pattern, no meal and no position to hold in a fixed sequence. Giving it
+            a slot row of its own would also have cost the squares the thing that makes them
+            legible at 6px — five positions that never move. */}
+        {weighed ? <WeighMark /> : null}
       </span>
 
       {/* Slot tracks are drawn only on days that have something. Eight empty tracks on every
@@ -244,6 +261,24 @@ function Square({
       {content}
     </Link>
   );
+}
+
+/**
+ * A weigh-in happened on this day. Presence only — never the number.
+ *
+ * The weight itself is on the day page, and on Today's chart where it can be read against the
+ * days either side of it. A calendar square encodes kind and presence; "205.0" in a 48px box is
+ * a magnitude nothing here can compare it to, and it would be the only figure in the grid.
+ *
+ * Monochrome, like the meal slots and for the same reason — colour in this app means movement
+ * pattern and nothing else. It is deliberately NOT `--signal` either, since that is already the
+ * outline around today and would read as a second thing being said about the same square.
+ *
+ * No `draw-x`: that animation is a bar growing to its length, and length is the reading it
+ * carries. A mark that is either there or not has nothing to grow, so it arrives with the grid.
+ */
+function WeighMark() {
+  return <span style={{ width: 4, height: 4, background: 'var(--ink-dim)', flexShrink: 0 }} />;
 }
 
 /** One legend line: the lit slots, then what each position means, in the slots' own order. */

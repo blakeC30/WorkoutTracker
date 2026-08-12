@@ -121,7 +121,20 @@ export const workoutInput = z.object({
     .describe(
       'One entry PER SET, in the order performed. "3x5 at 225" is three identical entries; ' +
         '"225x5, 245x3, 265x1" is three different ones. Cardio is a single entry with ' +
-        'distance_mi and/or duration_min. Re-logging an exercise on a day REPLACES its sets.',
+        'distance_mi and/or duration_min. See set_mode for what happens to sets already ' +
+        'logged for this exercise on this date.',
+    ),
+  set_mode: z
+    .enum(['replace', 'append'])
+    .default('replace')
+    .describe(
+      'What to do with sets ALREADY logged for this exercise on this date. "replace" — the ' +
+        'default — throws them away and stores this list instead, which is what a correction ' +
+        'means: send the full corrected list, not only the set that changed. Use "append" ' +
+        'when this is ADDITIONAL work rather than a restatement: a second session or second ' +
+        'walk the same day, or "I forgot to say I also did two more sets". Getting this wrong ' +
+        'in the append direction double-counts; getting it wrong in the replace direction ' +
+        'destroys the earlier sets, and only the journal text will still mention them.',
     ),
   notes: z.string().optional().describe('About the session as a whole.'),
 });

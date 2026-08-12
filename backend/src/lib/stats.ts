@@ -351,24 +351,23 @@ export async function getDailyNutrition(days = 30) {
     order by m.entry_date`;
 }
 
-/** Bodyweight with a 7-day rolling average, since day-to-day noise swamps the trend. */
+/**
+ * Bodyweight, as weighed. One row per weigh-in, nothing derived.
+ *
+ * This used to carry a 7-day rolling average alongside each reading, on the usual argument
+ * that daily noise swamps a shallow trend. It was removed deliberately and should not come
+ * back: an average moves against the reading whenever a new weigh-in lands below the running
+ * mean, so the smoothed figure falls on days the scale went up. On a chart whose entire job is
+ * answering "what do I weigh", having to explain that costs more than the noise does.
+ *
+ * The consequence to keep in mind is that every consumer is reading real weigh-ins, so a
+ * change between two dates is a change between two actual mornings — water, food and all.
+ */
 export async function getBodyweightTrend(days = 90) {
   const sql = getSql();
   return sql`
     select entry_date::text as date,
-           weight_lbs,
-           -- RANGE over an interval, not ROWS. With missed weigh-ins a 6-row window reaches
-           -- back however far those rows happen to span — on this history, up to ten days —
-           -- so it silently stops being a seven-day average exactly when weighing is
-           -- irregular, which is when the smoothing matters most.
-           round(avg(weight_lbs) over (
-             order by entry_date
-             range between interval '6 days' preceding and current row
-           ), 1) as rolling_7d,
-           count(*) over (
-             order by entry_date
-             range between interval '6 days' preceding and current row
-           )::int as days_in_window
+           weight_lbs
     from bodyweight
     where entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
     order by entry_date`;

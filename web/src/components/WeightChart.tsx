@@ -20,10 +20,14 @@ import { agoLabel, dayLabel, dec, parseDay } from '@/lib/format';
  * a shallow trend. That is true and it still cost more than it bought: an average moves against
  * the reading whenever a new weigh-in lands below the running mean, so the line fell on days
  * the scale went up. Explaining that every time is a worse outcome than a slightly noisier
- * line, on a chart whose entire job is answering "what do I weigh". The smoothed figure is
- * still reported, as the caption under the plot.
+ * line, on a chart whose entire job is answering "what do I weigh".
+ *
+ * The average was kept for a while as the caption under the plot, which left the screen saying
+ * two different things about the same quantity — and left the query computing a column only the
+ * caption read. It is gone from here, from `BodyweightRow`, and from `getBodyweightTrend`.
+ * Every number on this screen is now a reading off the scale.
  */
-type Point = { date: string; weight: number; avg: number; days: number };
+type Point = { date: string; weight: number };
 
 /**
  * Minimum span of the y-axis, in pounds.
@@ -58,10 +62,8 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
     .map((row) => ({
       date: row.date,
       weight: n(row.weight_lbs),
-      avg: n(row.rolling_7d),
-      days: row.days_in_window,
     }))
-    .filter((point): point is Point => point.weight !== null && point.avg !== null);
+    .filter((point): point is Point => point.weight !== null);
 
   const [active, setActive] = useState<number | null>(null);
   const plot = useRef<HTMLDivElement>(null);
@@ -124,7 +126,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         {/* No count-up while scrubbing: the number is changing under your finger, and animating
             each step would lag behind the thing you are pointing at. */}
         <Figure
-          value={dec(shown.weight ?? shown.avg)}
+          value={dec(shown.weight)}
           unit="LB"
           size="var(--t-3xl)"
           count={scrubbing ? undefined : latest.weight}
@@ -147,17 +149,11 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         <Sparkline points={line} height={54} activeIndex={active} floor={span} />
       </div>
 
-      <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-        {/* Says the window it actually averaged. `range between interval '6 days' preceding`
-            gives a 7-day average only once seven days of weigh-ins exist; before that it is an
-            average of however many there are, and calling a mean of three readings a "7-day
-            avg" is the label doing the misleading rather than the number. */}
-        <span>
-          {shown.days >= 7 ? '7-day avg' : `${shown.days}-day avg`} {dec(shown.avg)}
-        </span>
-        <span style={{ color: 'var(--ink-faint)' }}>
-          {scrubbing ? 'Release to return' : `${series.length} weigh-ins / 90d`}
-        </span>
+      {/* One caption, and it counts readings rather than describing them. The average that used
+          to sit on the left was the last derived number on this screen; with it gone there is
+          nothing here that isn't a weigh-in. */}
+      <div className="cap" style={{ marginTop: 10, color: 'var(--ink-faint)' }}>
+        {scrubbing ? 'Release to return' : `${series.length} weigh-ins / 90d`}
       </div>
     </Section>
   );
