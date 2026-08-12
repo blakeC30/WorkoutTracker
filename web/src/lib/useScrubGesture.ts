@@ -25,14 +25,34 @@ import type { PointerEvent } from 'react';
  * instant: the browser scrolls immediately rather than waiting to see what this decides.
  */
 
-/**
- * How far a finger travels before the gesture is called.
+/*
+ * The two outcomes are not symmetric, and the thresholds say so.
  *
- * Eight pixels, in the neighbourhood of what the browser itself uses to start a scroll. Much
- * lower and a thumb resting on the plot reads as a drag; much higher and a genuine scrub feels
- * like it ignores the start of the movement.
+ * Guessing "scroll" wrongly costs a moment: the page moves a little, you drag again. Guessing
+ * "scrub" wrongly captures the pointer, and the page then refuses to scroll for the rest of
+ * the gesture — the finger keeps moving and nothing happens. One is a hesitation, the other
+ * reads as broken. So scrolling is the default and scrubbing has to earn it.
+ *
+ * The reason this matters at all is that a thumb does not travel in straight lines. Scrolling
+ * with the thumb pivots from its base, and the first few pixels of that arc are often as
+ * sideways as they are down. A rule of "whichever axis is ahead right now" is a coin flip on
+ * that arc — which is exactly what made the charts work sometimes and not others.
  */
-const INTENT_PX = 8;
+
+/** Vertical travel that hands the gesture to the page. Low, because bailing out is cheap. */
+const SCROLL_PX = 8;
+
+/** Horizontal travel before a scrub may start. Higher, because committing is not cheap. */
+const SCRUB_PX = 12;
+
+/**
+ * How much further sideways than downward the finger must have gone to count as a scrub.
+ *
+ * 1.7 is about 30 degrees off horizontal. Inside that wedge the movement is unambiguous;
+ * outside it, and not yet vertical enough to abandon, the gesture stays undecided and waits
+ * for more travel rather than committing on a tie.
+ */
+const SCRUB_BIAS = 1.7;
 
 type Intent = 'undecided' | 'scrub' | 'scroll';
 
@@ -76,16 +96,24 @@ export function useScrubGesture({
 
       const dx = Math.abs(event.clientX - from.x);
       const dy = Math.abs(event.clientY - from.y);
-      if (Math.max(dx, dy) < INTENT_PX) return;
 
-      if (dx > dy) {
+      // Checked first, and on the looser condition, so anything with real vertical intent
+      // leaves before it can be mistaken for a drag.
+      if (dy >= SCROLL_PX && dy >= dx) {
+        intent.current = 'scroll';
+        return;
+      }
+
+      if (dx >= SCRUB_PX && dx >= dy * SCRUB_BIAS) {
         intent.current = 'scrub';
         event.currentTarget.setPointerCapture(event.pointerId);
         onScrub(event.clientX);
-      } else {
-        // Vertical. Hand the gesture to the page and stay out of it until the next contact.
-        intent.current = 'scroll';
+        return;
       }
+
+      // Neither yet. Staying undecided is the point: a gesture that has not declared itself
+      // gets to keep travelling, and if the browser claims it for a scroll in the meantime,
+      // pointercancel arrives having committed to nothing.
     },
     [onScrub],
   );
