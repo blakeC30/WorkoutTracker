@@ -13,12 +13,16 @@ import { agoLabel, dayLabel, dec, parseDay } from '@/lib/format';
  * the nutrition chart uses: the whole plot is one drag surface and the nearest day wins, because
  * ninety points across 350px is about 4px each — far under what a fingertip can hit.
  *
- * The line plots the 7-day ROLLING AVERAGE, but the readout reports the RAW weigh-in for that
- * day. Those are different numbers on purpose: the smoothed line is what you read for a trend,
- * and daily noise of a pound either way would bury a trend this shallow — but "what did I
- * actually weigh on 12 July" wants the number that was on the scale. Both are labelled.
+ * The line plots the WEIGH-INS — the numbers that were on the scale, nothing smoothed.
+ *
+ * It used to plot the 7-day rolling average, on the standard reasoning that daily noise buries
+ * a shallow trend. That is true and it still cost more than it bought: an average moves against
+ * the reading whenever a new weigh-in lands below the running mean, so the line fell on days
+ * the scale went up. Explaining that every time is a worse outcome than a slightly noisier
+ * line, on a chart whose entire job is answering "what do I weigh". The smoothed figure is
+ * still reported, as the caption under the plot.
  */
-type Point = { date: string; weight: number | null; avg: number; days: number };
+type Point = { date: string; weight: number; avg: number; days: number };
 
 /**
  * Minimum span of the y-axis, in pounds.
@@ -46,8 +50,9 @@ const MIN_SPAN_LB = 3;
 const HEADROOM = 1.25;
 
 export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
-  // Rows without a rolling average cannot be plotted, and dropping them separately from the
-  // dates would desynchronise the index the scrub resolves to. One filtered array, one index.
+  // A row with no weigh-in has nothing to plot now that the line IS the weigh-ins. Dropping
+  // those separately from the dates would desynchronise the index the scrub resolves to, so
+  // there is one filtered array and one index into it.
   const series: Point[] = rows
     .map((row) => ({
       date: row.date,
@@ -55,7 +60,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
       avg: n(row.rolling_7d),
       days: row.days_in_window,
     }))
-    .filter((point): point is Point => point.avg !== null);
+    .filter((point): point is Point => point.weight !== null && point.avg !== null);
 
   const [active, setActive] = useState<number | null>(null);
   const plot = useRef<HTMLDivElement>(null);
@@ -81,31 +86,14 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
   const latest = series[series.length - 1];
   const shown = active === null ? latest : series[active];
 
-  /*
-   * The delta compares WEIGH-INS at both ends — the numbers that were on the scale.
-   *
-   * It used to compare the rolling average, on the reasoning that one heavy dinner should not
-   * be the baseline a month of progress is measured from. That reasoning holds only once both
-   * ends are genuine 7-day means. While the window is filling it is actively wrong: the oldest
-   * point's "average" is a mean of one reading, so the sum was a 3-reading mean minus a
-   * 1-reading mean, which is not a comparison of anything.
-   *
-   * It also disagreed with the headline. That figure is the raw weigh-in, so subtracting the
-   * delta from it landed on a number that was in no row of the table. Reading a chart should
-   * not require knowing which of two series each line of text came from. The smoothed view is
-   * still here — it is the line, and the caption underneath it.
-   *
-   * Both ends must be rows that actually have a reading: `avg` can outlive `weight` in a row,
-   * and a null on either end would silently make the change smaller than it was.
-   */
-  const weighed = series.filter((p): p is Point & { weight: number } => p.weight !== null);
-  const newest = weighed[weighed.length - 1];
-  // The oldest reading still inside the 30-day window, or simply the oldest there is.
-  const baseline = weighed.find((p) => daysBetween(p.date, newest.date) <= 30) ?? weighed[0];
-  const change = newest ? newest.weight - baseline.weight : 0;
+  // The oldest weigh-in still inside the 30-day window, or simply the oldest there is. Every
+  // point carries a reading now, so the headline, the line and this comparison are all the
+  // same quantity — there is no longer a way for them to disagree.
+  const baseline = series.find((p) => daysBetween(p.date, latest.date) <= 30) ?? series[0];
+  const change = latest.weight - baseline.weight;
   // Elapsed days between the two readings compared, not how many readings there were. "30d"
   // everywhere else in the app is a duration, and this has to read the same way.
-  const over = newest ? `${Math.round(daysBetween(baseline.date, newest.date))}d` : '';
+  const over = `${Math.round(daysBetween(baseline.date, latest.date))}d`;
 
   const scrubbing = active !== null;
 
@@ -117,16 +105,8 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
    * rather than as the full height of the panel. Wide series — the padded spread wins, so the
    * chart scales with the data exactly as before and merely stops short of the edges.
    */
-  const line = series.map((p) => p.avg);
-  // The weigh-ins themselves, behind the smoothed line.
-  //
-  // Without them the chart could show a fall on a day the scale went up — which is not a
-  // fault, it is what a rolling average does when the reading lands below the running mean,
-  // but it is unreadable unless the reading is on the screen too. Drawing both makes the two
-  // facts visible at once: the point rose, the trend eased.
-  const weighIns = series.map((p) => p.weight);
-  const values = [...line, ...weighIns.filter((v): v is number => v !== null)];
-  const spread = Math.max(...values) - Math.min(...values);
+  const line = series.map((p) => p.weight);
+  const spread = Math.max(...line) - Math.min(...line);
   const span = Math.max(MIN_SPAN_LB, spread * HEADROOM);
 
   return (
@@ -146,7 +126,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         />
         {/* Two readings is the minimum for a change to exist. One weigh-in showing "0.0 lb"
             would be reporting that nothing moved, which is a claim, not an absence. */}
-        {scrubbing || weighed.length < 2 ? null : (
+        {scrubbing || series.length < 2 ? null : (
           <Delta value={change} unit="lb" over={over} decimals={1} />
         )}
       </div>
@@ -167,7 +147,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         onPointerUp={() => setActive(null)}
         onPointerCancel={() => setActive(null)}
       >
-        <Sparkline points={line} ghost={weighIns} height={54} activeIndex={active} floor={span} />
+        <Sparkline points={line} height={54} activeIndex={active} floor={span} />
       </div>
 
       <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>

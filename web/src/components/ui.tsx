@@ -205,7 +205,6 @@ export function BarRow({
  */
 export function Sparkline({
   points,
-  ghost,
   height = 44,
   tone = 'var(--signal)',
   fill = true,
@@ -213,19 +212,6 @@ export function Sparkline({
   activeIndex = null,
 }: {
   points: number[];
-  /**
-   * A second series behind the first, drawn faint and unmarked — the readings a smoothed
-   * `points` was computed from.
-   *
-   * Scaled on the SAME axis as `points`, which is the entire reason it lives in here rather
-   * than being a second <Sparkline> stacked behind: two sparklines each scale to their own
-   * min and max, so the two lines would sit on different axes and crossing them would mean
-   * nothing at all.
-   *
-   * `null` breaks the line rather than interpolating across it. A day with no reading is not
-   * a day the value was halfway between its neighbours.
-   */
-  ghost?: (number | null)[];
   height?: number;
   tone?: string;
   fill?: boolean;
@@ -249,29 +235,14 @@ export function Sparkline({
 
   const W = 100;
   const H = 30;
-  // Both series share one axis, so the extremes are taken across both. Scaling to `points`
-  // alone would let a raw reading outside the smoothed range draw off the top of the plot.
-  const all = ghost ? [...points, ...ghost.filter((v): v is number => v !== null)] : points;
-  const min = Math.min(...all);
-  const max = Math.max(...all);
+  const min = Math.min(...points);
+  const max = Math.max(...points);
   // A flat series would divide by zero; drawing it down the middle is the honest picture.
   const span = Math.max(max - min, floor, 1e-9) || 1;
   const mid = (min + max) / 2;
   const lo = mid - span / 2;
   const step = W / (points.length - 1);
-  const y = (value: number) => H - ((value - lo) / span) * H;
-
-  // Gaps start a new subpath instead of joining across them.
-  const ghostPath = (ghost ?? [])
-    .map((value, i) => (value === null ? null : ([i * step, y(value)] as const)))
-    .reduce<string>((path, point, i, list) => {
-      if (!point) return path;
-      const command = i === 0 || !list[i - 1] ? 'M' : 'L';
-      return `${path}${command}${point[0].toFixed(2)},${point[1].toFixed(2)} `;
-    }, '')
-    .trim();
-
-  const coords = points.map((p, i) => [i * step, y(p)] as const);
+  const coords = points.map((p, i) => [i * step, H - ((p - lo) / span) * H] as const);
   const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
   const area = `${line} L${W},${H} L0,${H} Z`;
   const at = activeIndex === null ? coords.length - 1 : Math.min(Math.max(activeIndex, 0), coords.length - 1);
@@ -289,26 +260,13 @@ export function Sparkline({
           `opacity: 1` from a generic reveal would beat the 0.12 attribute and flood the panel. */}
       <g className="wipe-x">
         {fill ? <path d={area} fill={tone} className="fill-in" /> : null}
-        {/* Above the fill so it is not washed out by it, below the line so the smoothed
-            series stays the one thing being read. Same hue rather than a second colour —
-            these are the same measurement at two levels of emphasis, and the categorical
-            palette is spoken for. */}
-        {ghostPath ? (
-          <path
-            d={ghostPath}
-            fill="none"
-            stroke={tone}
-            strokeWidth={1}
-            opacity={0.38}
-            vectorEffect="non-scaling-stroke"
-          />
-        ) : null}
         <path d={line} fill="none" stroke={tone} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       </g>
       {/* The current value gets a mark; every other point does not. One focal point.
-          Drawn as a zero-length round-capped LINE rather than a <circle>: the viewBox is
-          stretched unequally by preserveAspectRatio="none", which turns a circle into an
-          ellipse. Stroke geometry escapes that via non-scaling-stroke, so the cap stays round. */}
+          A zero-length LINE rather than a <rect>: the viewBox is stretched unequally by
+          preserveAspectRatio="none", so a rect 4 units wide and 4 tall comes out as a wide
+          flat bar. Stroke geometry escapes that scaling via non-scaling-stroke, so a square
+          cap on a zero-length segment is a true square in device pixels at any plot size. */}
       {/* A guide only while scrubbing. At rest the marker alone is enough, and a permanent
           vertical rule would be one more line on a screen already made of them. */}
       {activeIndex !== null ? (
@@ -330,7 +288,7 @@ export function Sparkline({
         y2={lastY}
         stroke={tone}
         strokeWidth={5}
-        strokeLinecap="round"
+        strokeLinecap="square"
         vectorEffect="non-scaling-stroke"
         className="mark-in"
       />
