@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { getExercise, n, n0, type ExerciseHistory, type ExerciseSession } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Delta, Sparkline, Empty, Fault } from '@/components/ui';
+import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
+import { ExerciseProgress } from '@/components/ExerciseProgress';
 import { patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, clock, dec, int, shortDay } from '@/lib/format';
 
@@ -55,7 +56,7 @@ export default async function ExercisePage({ params }: { params: Promise<{ name:
       ) : (
         <>
           <Reveal>
-            <Progress sessions={sessions} tone={tone} />
+            <ExerciseProgress sessions={sessions} tone={tone} />
           </Reveal>
           <Rule />
           <Reveal delay={80}>
@@ -87,124 +88,6 @@ function BackLink() {
     >
       ‹ All exercises
     </Link>
-  );
-}
-
-function Progress({ sessions, tone }: { sessions: ExerciseSession[]; tone: string }) {
-  const loaded = sessions.filter((s) => n(s.e1rm) !== null);
-  const endurance = sessions.filter((s) => n(s.distance_mi) !== null || n(s.duration_min) !== null);
-
-  // Bodyweight work: reps at no load. This branch did not exist, and because such a session has
-  // no e1RM, no distance and no duration, BOTH other branches came up empty — `endurance[last]`
-  // was undefined and reading its date threw, so a push-up's detail page rendered as a blank
-  // shell. The record is the best single set, mirroring how the loaded branch reports e1RM.
-  const repped = sessions
-    .map((s) => ({
-      date: s.date,
-      best: Math.max(...s.set_detail.filter((d) => n0(d.weight_lbs) === 0).map((d) => d.reps ?? 0), 0),
-      total: s.total_reps,
-    }))
-    .filter((s) => s.best > 0);
-
-  if (loaded.length === 0 && endurance.length === 0 && repped.length > 0) {
-    const series = repped.map((s) => s.best);
-    const latest = repped[repped.length - 1];
-    const best = Math.max(...series);
-
-    return (
-      <Section label="Best set" aside={`${sessions.length} session${sessions.length === 1 ? '' : 's'}`}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <Figure value={String(latest.best)} unit="REPS" size="var(--t-3xl)" count={latest.best} tone={tone} />
-          <Delta
-            value={series.length > 1 ? latest.best - series[0] : null}
-            unit="reps"
-            over={`${series.length} session${series.length === 1 ? '' : 's'}`}
-          />
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <Sparkline points={series} height={58} tone={tone} />
-        </div>
-        <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-          <span>Best {best} in a set</span>
-          <span style={{ color: 'var(--ink-faint)' }}>{int(latest.total)} reps last session</span>
-        </div>
-      </Section>
-    );
-  }
-
-  // Nothing measurable at all. Reachable if a session recorded only notes, and it must render
-  // something rather than fall through to code that assumes a series exists.
-  if (loaded.length === 0 && endurance.length === 0) {
-    return (
-      <Section label="Sessions" aside={`${sessions.length}`}>
-        <Empty>Recorded, but with no weight, reps, distance or time to chart.</Empty>
-      </Section>
-    );
-  }
-
-  if (loaded.length === 0) {
-    // Cardio and timed work have no estimated max; distance is the series that means something.
-    const series = endurance.map((s) => n0(s.distance_mi) || n0(s.duration_min));
-    const latest = endurance[endurance.length - 1];
-    const best = Math.max(...series, 0);
-    // Distance when it is recorded, minutes otherwise — and the heading names whichever it is.
-    // It previously read "Best effort" above the LATEST session, so a 7.90 mile ride sat under a
-    // heading claiming it was the best while the footer said 11.80 two lines below.
-    const isDistance = n(latest?.distance_mi) !== null;
-    const current = isDistance ? n(latest?.distance_mi) : n(latest?.duration_min);
-
-    return (
-      <Section label={isDistance ? 'Distance' : 'Duration'} aside={`${sessions.length} session${sessions.length === 1 ? '' : 's'}`}>
-        <Figure
-          value={dec(current, 2)}
-          unit={isDistance ? 'MI' : 'MIN'}
-          size="var(--t-3xl)"
-          count={current}
-          decimals={2}
-          tone={tone}
-        />
-        <div style={{ marginTop: 16 }}>
-          <Sparkline points={series} height={54} tone={tone} />
-        </div>
-        <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-          <span>Best {dec(best, 2)}</span>
-          <span style={{ color: 'var(--ink-faint)' }}>last {agoLabel(latest.date).toLowerCase()}</span>
-        </div>
-      </Section>
-    );
-  }
-
-  const series = loaded.map((s) => n0(s.e1rm));
-  const current = series[series.length - 1];
-  const best = Math.max(...series);
-  const first = series[0];
-
-  // Change since the first session on record, not since the previous one. Session-to-session
-  // noise on an estimate is a couple of pounds either way and says nothing; the span is the
-  // thing worth reading.
-  const change = series.length > 1 ? current - first : null;
-
-  return (
-    <Section label="Estimated 1RM" aside={`${sessions.length} session${sessions.length === 1 ? '' : 's'}`}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-        <Figure value={int(current)} unit="LB" size="var(--t-3xl)" count={current} tone={tone} />
-        <Delta value={change} unit="lb" over={`${loaded.length} session${loaded.length === 1 ? '' : 's'}`} />
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <Sparkline points={series} height={58} tone={tone} />
-      </div>
-
-      <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-        <span>
-          Best {int(best)}
-          {best > current ? <span style={{ color: 'var(--ink-faint)' }}> · {int(best - current)} off</span> : null}
-        </span>
-        <span style={{ color: 'var(--ink-faint)' }}>
-          {shortDay(loaded[0].date)} – {shortDay(loaded[loaded.length - 1].date)}
-        </span>
-      </div>
-    </Section>
   );
 }
 
