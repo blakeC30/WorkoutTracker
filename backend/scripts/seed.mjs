@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 //
-// Generates roughly eight weeks of plausible training history so the dashboard and the
-// programming agent have something real-shaped to develop against.
+// Generates roughly eight weeks of plausible training history, so the dashboard has
+// something real-shaped to develop against.
 //
 // Every row it writes is marked is_seed = true, and `npm run seed:clear` removes exactly
 // those rows. Nothing here touches data logged through Claude.
 //
 // Plausible matters more than pretty. Real history has missed weeks, sessions that go
 // backwards, bodyweight that wobbles rather than sliding, and meals that were guessed at.
-// A tidy upward line would make the Phase 5 agent look far better than it deserves.
+// A tidy upward line would flatter every chart that read it, and would never exercise the
+// states those charts actually have to survive: a week with nothing in it, a lift that went
+// backwards, a day logged without a number.
 //
 // Run with:  npm run seed
 

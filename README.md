@@ -11,7 +11,7 @@ using Vercel's Root Directory setting.
 
 | Folder     | Vercel Root Directory | What it is                                             |
 | ---------- | --------------------- | ------------------------------------------------------ |
-| `backend/` | `backend`             | MCP server, REST read API, LangGraph agent. Owns Postgres. |
+| `backend/` | `backend`             | MCP server and REST read API. Owns Postgres.           |
 | `web/`     | `web`                 | Dashboard. Talks to the backend, never to Postgres.    |
 
 Duplicating a few type definitions between the two is expected and fine.
