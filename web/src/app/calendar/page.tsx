@@ -86,9 +86,18 @@ function Pager({ current }: { current: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
       <Step href={`/calendar?m=${previous}`} label={`‹ ${monthShape(previous).short}`} />
-      <Link href="/calendar" className="cap pressable" style={{ color: 'var(--ink-dim)', padding: '10px 12px' }}>
-        This month
-      </Link>
+      {/* The month you are ON, so the row reads JUL · AUG · SEP and the middle names the thing
+          either arrow moves you away from. It used to be a "This month" shortcut back to the
+          present, which was the one label here that did not describe a month at all — and in a
+          row of three, the middle slot is where you look to find out where you are.
+
+          Ink rather than --signal, even though this is "the current value": amber in THIS row
+          means tappable, since both arrows carry it. An amber label that does nothing when
+          pressed would be the row contradicting itself. Whether you are on the present month is
+          already said by the next arrow, which greys out when there is nowhere further to go. */}
+      <span className="cap" style={{ color: 'var(--ink)', padding: '10px 12px' }}>
+        {monthShape(current).short}
+      </span>
       {atPresent ? (
         <span className="cap" style={{ color: 'var(--ink-faint)', opacity: 0.4, padding: '10px 0' }}>
           {monthShape(next).short} ›
