@@ -40,6 +40,26 @@ type Point = {
  * collapses to nothing and the chart reads as unbroken normal eating. Padding the gaps back in
  * is what makes the axis mean time again.
  */
+/**
+ * How far the plot sits inside its own SVG, in pixels — and equally, how far the SVG bleeds
+ * past the content column, since the wrapper is pulled out by the same amount.
+ *
+ * The two cancel, so the plot area lands exactly on the text column either way. What the
+ * number buys is room for the axis labels, which are centred on their tick and hang half
+ * their width to each side of it. At 6px the first label — centred about 6px into the plot,
+ * ~36px wide — reached 12px past the SVG's left edge and was clipped by roughly one
+ * character: "14 JUL" arrived as "4 JUL", which reads as a real date and so does not even
+ * look like a rendering fault.
+ *
+ * 20px is the page gutter, so the SVG now spans the full screen width and the label clears
+ * its edge by about 8px. Any smaller and the exact clipping depends on font metrics.
+ *
+ * It is one constant because the scrub reads it too: mapping a touch to a day means knowing
+ * where the plot starts inside the box being touched, and a chart margin that drifted from
+ * that number would silently select the wrong day near the edges.
+ */
+const PLOT_INSET = 20;
+
 function buildSeries(rows: NutritionRow[], days: number): Point[] {
   const byDate = new Map(rows.map((r) => [r.date, r]));
   const out: Point[] = [];
@@ -99,9 +119,8 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
     (clientX: number) => {
       const box = plot.current?.getBoundingClientRect();
       if (!box || data.length === 0) return;
-      const inset = 6; // matches the chart's left/right margin
-      const usable = box.width - inset * 2;
-      const ratio = (clientX - box.left - inset) / (usable || 1);
+      const usable = box.width - PLOT_INSET * 2;
+      const ratio = (clientX - box.left - PLOT_INSET) / (usable || 1);
       const index = Math.round(ratio * (data.length - 1));
       setSelected(Math.min(Math.max(index, 0), data.length - 1));
     },
@@ -149,13 +168,20 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
       <div
         ref={plot}
         className="chart-in"
-        style={{ height: 168, margin: '14px -6px 0', position: 'relative', touchAction: 'pan-y' }}
+        // Pulled out by exactly PLOT_INSET, which the chart's margin then puts back — the plot
+        // lands on the text column and the labels get the gutter to overhang into.
+        style={{
+          height: 168,
+          margin: `14px -${PLOT_INSET}px 0`,
+          position: 'relative',
+          touchAction: 'pan-y',
+        }}
         {...gesture}
       >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={data}
-            margin={{ top: 8, right: 6, bottom: 0, left: 6 }}
+            margin={{ top: 8, right: PLOT_INSET, bottom: 0, left: PLOT_INSET }}
             // Recharts 3 ships an accessibility layer by default: it puts role="application"
             // and tabindex="0" on the SVG surface and tabindex="-1" on every internal layer.
             // Touching the chart focuses those, and the app's global focus ring then paints
