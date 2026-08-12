@@ -12,14 +12,17 @@
 
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
+import { assertNotProduction, getConnectionString, printTarget } from './lib/env.mjs';
 
 neonConfig.webSocketConstructor = ws;
 
-const connectionString = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error('DATABASE_URL is not set. Fill in backend/.env.local first.');
-  process.exit(1);
-}
+// Scoped to `where is_seed`, so it cannot reach real rows even if it ran against production.
+// Guarded anyway: the scoping is a property of the SQL below, and the next person to edit
+// that SQL should have to get past this line first.
+assertNotProduction('clear seeded rows', { direct: true });
+printTarget('Clearing seeded rows', { direct: true });
+
+const connectionString = getConnectionString({ direct: true });
 
 const pool = new Pool({ connectionString });
 

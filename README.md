@@ -26,32 +26,69 @@ Duplicating a few type definitions between the two is expected and fine.
 ## Local setup
 
 ```bash
-cd backend && npm install && cp .env.example .env.local   # then fill in .env.local
-npm run migrate
+cd backend && npm install
+cp .env.example .env.local              # fill in with the Neon DEV BRANCH, APP_ENV=development
+cp .env.example .env.production.local   # fill in with production, APP_ENV=production
+npm run db:target                       # confirm .env.local is pointed at the dev branch
+npm run migrate                         # applies to the dev branch
 
 cd ../web && npm install && cp .env.example .env.local
 ```
 
+See [Environments](#environments) for why there are two files and which commands read which.
+
 ## Backend commands
 
-| Command             | What it does                                              |
-| ------------------- | --------------------------------------------------------- |
-| `npm run dev`       | Local dev server on :3000                                  |
-| `npm run migrate`   | Applies any unapplied `.sql` file in `migrations/`. Safe to re-run. |
-| `npm run seed`      | Eight weeks of invented history, every row `is_seed`. **Refuses to run against a database holding real rows** — override with `-- --force`. |
-| `npm run seed:clear`| Deletes `is_seed` rows only. Never touches anything logged through Claude. |
-| `npm run verify:e2e`| Read-only assertions for `prompts/e2e-test.md`. Expects an empty database. |
+| Command                | Database        | What it does                                |
+| ---------------------- | --------------- | ------------------------------------------- |
+| `npm run dev`          | dev branch      | Local dev server on :3000                   |
+| `npm run db:target`    | dev branch      | Prints which database this env file points at, and connects to prove it. |
+| `npm run migrate`      | dev branch      | Applies any unapplied `.sql` in `migrations/`. Safe to re-run. |
+| `npm run seed`         | dev branch      | Eight weeks of invented history, every row `is_seed`. |
+| `npm run seed:clear`   | dev branch      | Deletes `is_seed` rows only.                |
+| `npm run verify:e2e`   | dev branch      | Read-only assertions for `prompts/e2e-test.md`. |
+| `npm run migrate:prod` | **production**  | The same migrations, against production. Asks for the database name first. |
+| `npm run db:target:prod` | **production** | Read-only. Confirms what the production env file points at. |
 
-### The database is production
+## Environments
 
-Since **11 August 2026** the Neon database holds real logged training, and the dashboard is
-deployed on Vercel against it. Do not clear it. There is no undo — journals are the record
-of what was said, and once a row is gone the only copy is a Neon branch or backup.
+Since **11 August 2026** the Neon `main` branch is production: it holds real logged training,
+and the dashboard is deployed on Vercel against it. There is no undo. Journals are the record
+of what was said, and once a row is gone the only copy is a Neon branch or a backup.
 
-`seed:clear` is safe by construction (`where is_seed`), and `verify:e2e` never writes. The
-things that are *not* safe are `npm run seed` without its guard, ad-hoc `delete` in a psql
-session, and running `prompts/e2e-test.md` — that one logs through Claude like you do and
-has no guard at all. All three want a scratch database instead.
+Development happens on a **Neon dev branch** — copy-on-write, so it starts as a real-shaped
+copy of production and costs almost nothing. That is the part that matters: on a branch,
+destructive is free. Wipe it, seed it, truncate it, run the e2e prompts against it, then reset
+it from its parent in seconds.
+
+Two env files decide where a command lands, and **which one is the default is the whole
+design**:
+
+| File | Points at | Loaded by |
+| ---- | --------- | --------- |
+| `backend/.env.local` | Neon dev branch | everything except the two below |
+| `backend/.env.production.local` | production | `migrate:prod`, `db:target:prod` |
+
+This repo started with production in `.env.local`, so every local command reached production
+and safety was a memory task. Now forgetting fails safe: the unnamed default is dev, and
+production has to be asked for.
+
+`APP_ENV` in each file drives the guards in [`backend/scripts/lib/env.mjs`](backend/scripts/lib/env.mjs):
+
+- **`seed`, `seed:clear`** refuse outright against production.
+- **`migrate`** asks — migrations are the one destructive thing that legitimately has to reach
+  production, and also the least reversible. A y/n prompt is muscle memory, so it wants the
+  database name typed.
+- **Unset counts as production.** The unknown case is the dangerous one.
+- **`APP_ENV` is cross-checked**, because it is a label a human maintains. If it says
+  development while the connection points at the same host as `.env.production.local`, every
+  guarded script refuses. That single mistake — pasting the prod string in and leaving the
+  label alone — would otherwise defeat all of the above without a symptom.
+
+What is **not** guarded: `prompts/e2e-test.md`. Those prompts log through Claude exactly the
+way you do, so the only thing deciding where they land is which database the deployed backend
+behind your MCP connector is pointed at. Testing the logging flow safely needs a second
+deployment and a second connector; until that exists, the e2e suite has nowhere safe to run.
 
 ## The dashboard
 

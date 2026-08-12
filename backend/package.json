@@ -10,6 +10,9 @@
     "build": "next build",
     "start": "next start",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "migrate:prod": "node --env-file=.env.production.local scripts/migrate.mjs",
+    "db:target": "node --env-file=.env.local scripts/target.mjs",
+    "db:target:prod": "node --env-file=.env.production.local scripts/target.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "seed:clear": "node --env-file=.env.local scripts/seed-clear.mjs",
     "verify:e2e": "node --env-file=.env.local scripts/verify-e2e.mjs"

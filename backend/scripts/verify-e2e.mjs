@@ -18,8 +18,13 @@
 // to the first and quietly halves the history.
 
 import { neon } from '@neondatabase/serverless';
+import { getConnectionString, printTarget } from './lib/env.mjs';
 
-const sql = neon(process.env.DATABASE_URL);
+// Read-only, so no guard — but it still says which database it read. A green report from the
+// wrong database is worse than a red one, and row counts alone will not tell you which.
+printTarget('Verifying');
+
+const sql = neon(getConnectionString());
 
 const results = [];
 const check = (batch, name, state, detail = '') =>

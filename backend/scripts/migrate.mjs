@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
+import { confirmProduction, getConnectionString, printTarget } from './lib/env.mjs';
 
 // Node 20 has no global WebSocket, and Pool talks to Neon over one.
 neonConfig.webSocketConstructor = ws;
@@ -25,16 +26,14 @@ const MIGRATIONS_DIR = path.join(
 
 // Prefer the direct (unpooled) connection for schema changes. Neon's pooled endpoint runs
 // PgBouncer, which is fine for app queries but is not the right tool for DDL.
-const connectionString =
-  process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+const connectionString = getConnectionString({ direct: true });
 
-if (!connectionString) {
-  console.error(
-    'DATABASE_URL is not set.\n' +
-      'Copy backend/.env.example to backend/.env.local and fill it in.',
-  );
-  process.exit(1);
-}
+// Migrations are the one destructive thing that legitimately has to reach production, so this
+// asks rather than refuses. It is also the least reversible: a bad `alter table` is not a row
+// you can log again. `npm run migrate` hits the dev branch; `npm run migrate:prod` loads
+// .env.production.local and lands here.
+printTarget('Migrating', { direct: true });
+await confirmProduction('apply migrations', { direct: true });
 
 const pool = new Pool({ connectionString });
 
