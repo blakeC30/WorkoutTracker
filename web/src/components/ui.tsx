@@ -106,7 +106,24 @@ export function Figure({
  * because down is bad. Bodyweight, calories and volume all move both ways for good reasons,
  * and an app that decided which was praiseworthy would be wrong half the time.
  */
-export function Delta({ value, unit, over }: { value: number | null; unit?: string; over?: string }) {
+export function Delta({
+  value,
+  unit,
+  over,
+  /**
+   * Force a fixed number of decimals.
+   *
+   * By default a whole number prints bare, which is right next to a count of sessions and
+   * wrong next to a weight: `205.0 LB` with `▼ 2 lb` under it reads as two different kinds
+   * of measurement. Pass 1 where the figure beside it carries a decimal.
+   */
+  decimals,
+}: {
+  value: number | null;
+  unit?: string;
+  over?: string;
+  decimals?: number;
+}) {
   if (value === null) return null;
   const rounded = Math.abs(value) < 0.05 ? 0 : value;
   const tone = rounded > 0 ? 'var(--up)' : rounded < 0 ? 'var(--down)' : 'var(--ink-faint)';
@@ -115,7 +132,11 @@ export function Delta({ value, unit, over }: { value: number | null; unit?: stri
 
   return (
     <span className="mono" style={{ color: tone, fontSize: 'var(--t-sm)' }}>
-      {arrow} {magnitude.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+      {arrow}{' '}
+      {magnitude.toLocaleString('en-US', {
+        minimumFractionDigits: decimals ?? 0,
+        maximumFractionDigits: decimals ?? 1,
+      })}
       {unit ? ` ${unit}` : ''}
       {over ? <span style={{ color: 'var(--ink-faint)' }}>{` / ${over}`}</span> : null}
     </span>

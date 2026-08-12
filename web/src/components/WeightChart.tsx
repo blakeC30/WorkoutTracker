@@ -69,14 +69,31 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
   const latest = series[series.length - 1];
   const shown = active === null ? latest : series[active];
 
-  // Against the smoothed line 30 days back, not the raw reading — one heavy dinner four weeks
-  // ago should not be the baseline a month of progress is measured from.
-  const monthAgo = series.find((p) => daysBetween(p.date, latest.date) <= 30) ?? series[0];
-  const change = latest.avg - monthAgo.avg;
-  // The label has to be the span actually compared, not the span asked for. With a week of
-  // history `monthAgo` is the oldest reading there is, and calling that difference "30d" claims
-  // a month of progress from two days of data.
-  const over = `${Math.round(daysBetween(monthAgo.date, latest.date))}d`;
+  /*
+   * The delta compares WEIGH-INS at both ends — the numbers that were on the scale.
+   *
+   * It used to compare the rolling average, on the reasoning that one heavy dinner should not
+   * be the baseline a month of progress is measured from. That reasoning holds only once both
+   * ends are genuine 7-day means. While the window is filling it is actively wrong: the oldest
+   * point's "average" is a mean of one reading, so the sum was a 3-reading mean minus a
+   * 1-reading mean, which is not a comparison of anything.
+   *
+   * It also disagreed with the headline. That figure is the raw weigh-in, so subtracting the
+   * delta from it landed on a number that was in no row of the table. Reading a chart should
+   * not require knowing which of two series each line of text came from. The smoothed view is
+   * still here — it is the line, and the caption underneath it.
+   *
+   * Both ends must be rows that actually have a reading: `avg` can outlive `weight` in a row,
+   * and a null on either end would silently make the change smaller than it was.
+   */
+  const weighed = series.filter((p): p is Point & { weight: number } => p.weight !== null);
+  const newest = weighed[weighed.length - 1];
+  // The oldest reading still inside the 30-day window, or simply the oldest there is.
+  const baseline = weighed.find((p) => daysBetween(p.date, newest.date) <= 30) ?? weighed[0];
+  const change = newest ? newest.weight - baseline.weight : 0;
+  // Elapsed days between the two readings compared, not how many readings there were. "30d"
+  // everywhere else in the app is a duration, and this has to read the same way.
+  const over = newest ? `${Math.round(daysBetween(baseline.date, newest.date))}d` : '';
 
   const scrubbing = active !== null;
 
@@ -95,7 +112,11 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
           count={scrubbing ? undefined : latest.weight}
           decimals={1}
         />
-        {scrubbing ? null : <Delta value={change} unit="lb" over={over} />}
+        {/* Two readings is the minimum for a change to exist. One weigh-in showing "0.0 lb"
+            would be reporting that nothing moved, which is a claim, not an absence. */}
+        {scrubbing || weighed.length < 2 ? null : (
+          <Delta value={change} unit="lb" over={over} decimals={1} />
+        )}
       </div>
 
       <div
