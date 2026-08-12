@@ -5,6 +5,7 @@ import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YA
 import type { NutritionRow } from '@/lib/backend';
 import { Swatch } from '@/components/ui';
 import { dec, int, shortDay } from '@/lib/format';
+import { nowInAppTz } from '@/lib/time';
 
 /*
  * The one place in the app that uses Recharts.
@@ -41,7 +42,9 @@ type Point = {
 function buildSeries(rows: NutritionRow[], days: number): Point[] {
   const byDate = new Map(rows.map((r) => [r.date, r]));
   const out: Point[] = [];
-  const cursor = new Date();
+  // App timezone, not the browser's. This axis is matched against `entry_date` keys the
+  // backend wrote in Central, so a phone in another zone would shift every bucket by a day.
+  const cursor = nowInAppTz();
   cursor.setHours(12, 0, 0, 0); // midday, so a DST shift can't step the date backwards
   cursor.setDate(cursor.getDate() - (days - 1));
 

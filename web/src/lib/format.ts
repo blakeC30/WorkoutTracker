@@ -2,6 +2,8 @@
  * Date and number formatting. Safe to import from Client Components — no secrets here.
  */
 
+import { todayInAppTz } from './time';
+
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -66,12 +68,10 @@ export function clock(minutes: number | null): string {
   return `${whole}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** How many days ago, in the phone's timezone. Used to grey out stale rows. */
+/** How many days ago, in the app's timezone. Used to grey out stale rows. */
 export function daysAgo(iso: string): number {
   const then = parseDay(iso);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((today.getTime() - then.getTime()) / 86_400_000);
+  return Math.round((parseDay(todayInAppTz()).getTime() - then.getTime()) / 86_400_000);
 }
 
 const MONTH_NAMES = [
@@ -84,9 +84,14 @@ export function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Today, in the phone's own timezone. */
+/**
+ * Today, in the app's timezone — NOT the timezone of whatever machine is running this.
+ *
+ * These pages render on Vercel, where that machine is in UTC and is already on tomorrow for
+ * the last five hours of every Central day. See `./time`.
+ */
 export function today(): string {
-  return toIso(new Date());
+  return todayInAppTz();
 }
 
 /** Shifts a 'YYYY-MM-DD' by whole days, staying in local time. */

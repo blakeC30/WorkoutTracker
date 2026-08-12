@@ -4,6 +4,7 @@ import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
+import { nowInAppTz, todayInAppTz } from '@/lib/time';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,8 @@ export default async function Today() {
     getRecency(),
   ]);
 
-  const now = new Date();
+  // Not `new Date()`. This is a Server Component on Vercel, where that is UTC.
+  const now = nowInAppTz();
 
   return (
     <main className="screen">
@@ -113,8 +115,9 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
     );
   }
 
-  const today = toIso(new Date());
-  const row = result.rows.find((r) => r.date === today);
+  // Must be the same day the backend stamped these rows with, or the lookup misses and Fuel
+  // reads as "nothing logged today" on an evening when plenty was.
+  const row = result.rows.find((r) => r.date === todayInAppTz());
 
   if (!row) {
     // A blank rather than a zero. "0 kcal" is a claim about today that isn't true; nothing
