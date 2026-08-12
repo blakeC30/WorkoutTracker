@@ -41,6 +41,34 @@
   --core: #c97ba3;
   --cardio: #5fa87b;
 
+  /* Macros — a lightness ramp, NOT a second categorical palette.
+   *
+   * Three steps of one warm neutral rather than three hues, for three reasons. Adjacent
+   * segments of a split bar separate better by lightness than by hue at the same lightness;
+   * a ramp is legible under any colour-vision deficiency by construction rather than by
+   * luck; and it spends nothing from the categorical budget, so movement pattern stays the
+   * only dimension in this app that colour means.
+   *
+   * None of them is amber, and that is the load-bearing part. CALORIES are amber — the
+   * nutrition chart's bars are --signal-low, going --signal when selected — and calories are
+   * not a fourth macro, they are the axis the other three are drawn on (protein and carbs
+   * x4, fat x9). Before this ramp existed protein was --signal and fat was --signal-low, so
+   * on one screen fat was drawn in exactly the colour calories are drawn in on another.
+   *
+   * Protein is the lightest step because it is the macro the app already leads with: it is
+   * the chart's second series and the one named in the running average.
+   *
+   * The ramp is narrower than it could be, and the floor is why. These tones also carry the
+   * P/C/F letters in the food list at 11px, and --ink-faint is already the point below which
+   * DESIGN.md says nothing readable may go. So the darkest step sits just ABOVE --ink-faint
+   * rather than at the bottom of the available range: a wider ramp would separate the split
+   * bar's segments slightly better and make one of the three letters unreadable, which is a
+   * bad trade in a place where colour is redundant and the letter is the actual label.
+   */
+  --macro-protein: #cdc0ab;
+  --macro-carbs: #a2937c;
+  --macro-fat: #7b7062;
+
   --gutter: 20px;
   --tabbar: 52px;
 

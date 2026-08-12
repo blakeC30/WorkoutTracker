@@ -70,8 +70,9 @@ These are defined once in `src/lib/patterns.ts` and imported by every screen, so
 mean push on the calendar and pull on the lifts list. Rules that keep it from becoming the
 rainbow dashboard it could easily be:
 
-- **It encodes exactly one thing.** Muscle regions, meal types, macros and weeks all stay
-  monochrome. If a second dimension gets colours, the first one stops meaning anything.
+- **It encodes exactly one thing.** Muscle regions, meal types and weeks all stay monochrome. If
+  a second dimension gets colours, the first one stops meaning anything. Macros are the one
+  refinement of this, and they are still monochrome — see the ramp below.
 - **Colour is redundant, never load-bearing.** Slot position is fixed and a text label is always
   present, so the palette reinforces a reading you could already get without it. That is also
   what makes it safe for colour-vision deficiency — and why push and cardio, the red/green pair,
@@ -91,6 +92,36 @@ Semantic colours are kept separate from both, so "good" never has to borrow the 
 
 Direction is not judgement. Bodyweight down is `--down` because the number went down, not
 because that is bad. The app reports; it does not cheer.
+
+### The macro ramp
+
+Macros are the one place a second dimension is distinguished by colour, and it is a **lightness
+ramp of a single warm neutral**, not a second palette — so the categorical budget is still spent
+entirely on movement pattern.
+
+| Token | Value | Role |
+| --- | --- | --- |
+| `--macro-protein` | `#CDC0AB` | Protein. The lightest step |
+| `--macro-carbs` | `#A2937C` | Carbs |
+| `--macro-fat` | `#7B7062` | Fat. The darkest step, and still above `--ink-faint` |
+
+Why a ramp rather than three hues: adjacent segments of a split bar separate better by lightness
+than by hue at equal lightness, and a ramp survives any colour-vision deficiency by construction
+rather than by luck.
+
+**Calories are amber and are not a fourth macro.** They are the axis these three are drawn on —
+protein and carbs ×4, fat ×9 — so the nutrition chart's bars are `--signal-low`, going `--signal`
+when selected. None of the ramp may be amber. Before it existed, protein was `--signal` and fat
+was `--signal-low`, which meant fat on one screen was drawn in exactly the colour calories are
+drawn in on another.
+
+The floor is load-bearing: these tones also carry the P/C/F letters at 11px, so the darkest step
+sits just above `--ink-faint` rather than at the bottom of the range. A wider ramp would separate
+the bar slightly better and make one of the three letters unreadable.
+
+`MACROS` in `src/lib/macros.ts` is the single source, holding each macro's tone *and* its calories
+per gram — the two are always used together, and a bar drawn from one and coloured from the other
+is exactly where they would drift apart.
 
 ## Type
 

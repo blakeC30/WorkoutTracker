@@ -3,6 +3,7 @@ import { Masthead, Section, Rule, Figure, BarRow, Empty, Fault, Swatch } from '@
 import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
+import { MACROS, macroCalories } from '@/lib/macros';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
 import { signOut } from '@/app/login/actions';
@@ -146,15 +147,15 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
     );
   }
 
-  const protein = n0(row.protein_g);
-  const carbs = n0(row.carbs_g);
-  const fat = n0(row.fat_g);
+  const grams = { protein: n0(row.protein_g), carbs: n0(row.carbs_g), fat: n0(row.fat_g) };
+
   // Macro grams are not comparable by weight — a gram of fat carries more than twice the
   // energy of a gram of protein. The split bar is drawn in calories so its widths mean
-  // something; the labels stay in grams because that is how food is logged.
-  const kcal = [protein * 4, carbs * 4, fat * 9];
-  const total = kcal.reduce((a, b) => a + b, 0);
-  const tones = ['var(--signal)', 'var(--ink-dim)', 'var(--signal-low)'];
+  // something; the labels stay in grams because that is how food is logged. The conversion
+  // lives on MACROS beside the colours, since a bar drawn in one and coloured from the other
+  // is exactly where the two would drift apart.
+  const split = MACROS.map((m) => ({ ...m, grams: grams[m.key], kcal: macroCalories(m.key, grams[m.key]) }));
+  const total = split.reduce((sum, m) => sum + m.kcal, 0);
 
   return (
     <Section label="Fuel" aside={`${row.items} item${row.items === 1 ? '' : 's'}`}>
@@ -162,16 +163,16 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
 
       {total > 0 ? (
         <div style={{ display: 'flex', height: 8, marginTop: 16, gap: 2 }}>
-          {kcal.map((value, i) => (
-            <div key={i} style={{ flex: `${(value / total) * 100} 0 0`, background: tones[i] }} />
+          {split.map((m) => (
+            <div key={m.key} style={{ flex: `${(m.kcal / total) * 100} 0 0`, background: m.color }} />
           ))}
         </div>
       ) : null}
 
       <div style={{ display: 'flex', gap: 22, marginTop: 12 }}>
-        <Macro label="Protein" grams={protein} tone={tones[0]} />
-        <Macro label="Carbs" grams={carbs} tone={tones[1]} />
-        <Macro label="Fat" grams={fat} tone={tones[2]} />
+        {split.map((m) => (
+          <Macro key={m.key} label={m.label} grams={m.grams} tone={m.color} />
+        ))}
       </div>
     </Section>
   );

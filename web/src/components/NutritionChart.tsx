@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import type { NutritionRow } from '@/lib/backend';
 import { Swatch } from '@/components/ui';
+import { macroColor } from '@/lib/macros';
 import { useScrubGesture } from '@/lib/useScrubGesture';
 import { dec, int, shortDay } from '@/lib/format';
 import { nowInAppTz } from '@/lib/time';
@@ -287,7 +288,9 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
               yAxisId="protein"
               type="linear"
               dataKey="protein"
-              stroke="var(--ink-dim)"
+              // The macro ramp, not --ink-dim. The bars beside it are calories in amber, so the
+              // two series on this plot are now the two things they are everywhere else.
+              stroke={macroColor('protein')}
               strokeWidth={1.25}
               dot={false}
               // Recharts marks the active point with a circle by default. Belt and braces
@@ -323,7 +326,7 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
           <Swatch tone="var(--signal-low)" />
           kcal
           <span style={{ marginLeft: 12 }}>
-            <Swatch tone="var(--ink-dim)" />
+            <Swatch tone={macroColor('protein')} />
             protein
           </span>
         </span>

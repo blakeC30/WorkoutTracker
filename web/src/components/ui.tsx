@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Counter } from './motion';
+import { MACROS } from '@/lib/macros';
 
 /*
  * The vocabulary the screens are built from. All of it renders on the server — none of these
@@ -344,23 +345,32 @@ export function Macros({
   fat: number | null;
   size?: string;
 }) {
+  const values = { protein, carbs, fat };
   return (
     <span className="mono" style={{ display: 'inline-flex', gap: 14, fontSize: size }}>
-      <MacroPair value={protein} unit="P" />
-      <MacroPair value={carbs} unit="C" />
-      <MacroPair value={fat} unit="F" />
+      {MACROS.map((m) => (
+        <MacroPair key={m.key} value={values[m.key]} unit={m.short} tone={m.color} />
+      ))}
     </span>
   );
 }
 
-function MacroPair({ value, unit }: { value: number | null; unit: string }) {
+/**
+ * The unit letter carries the macro's tone; the number stays plain ink.
+ *
+ * Only the letter, because these sit in a dense row under a food name and three differently
+ * lit numbers would read as three different states rather than three quantities. The letter is
+ * the part that says WHICH macro, so it is the part the colour belongs on — and it makes the
+ * ramp mean the same thing here as it does in the split bar on Today.
+ */
+function MacroPair({ value, unit, tone }: { value: number | null; unit: string; tone: string }) {
   return (
     <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-dim)' }}>
       {value === null ? '—' : Math.round(value).toLocaleString('en-US')}
       {/* About half a space at this size — enough to breathe, still far tighter than the 14px
           between pairs, which is what does the grouping. A full space made the two read as
           separate tokens; none at all made them collide. */}
-      <span style={{ color: 'var(--ink-faint)', marginLeft: 3 }}>{unit}</span>
+      <span style={{ color: tone, marginLeft: 3 }}>{unit}</span>
     </span>
   );
 }
