@@ -18,13 +18,31 @@ import { agoLabel, dayLabel, dec, parseDay } from '@/lib/format';
  * and daily noise of a pound either way would bury a trend this shallow — but "what did I
  * actually weigh on 12 July" wants the number that was on the scale. Both are labelled.
  */
-type Point = { date: string; weight: number | null; avg: number };
+type Point = { date: string; weight: number | null; avg: number; days: number };
+
+/**
+ * Minimum span of the y-axis, in pounds.
+ *
+ * Without this the line scales to its own min and max, so ANY spread fills the full height —
+ * and bodyweight's honest spread over a few days is a pound or two. A 1.4lb wobble drawn as a
+ * cliff from the top of the panel to the bottom is not a small error of emphasis; it is the
+ * chart reporting a dramatic cut that did not happen.
+ *
+ * Six pounds is roughly the largest change that should still read as noise on this screen.
+ * Anything more genuinely is a trend and gets to use the height it earns.
+ */
+const MIN_SPAN_LB = 6;
 
 export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
   // Rows without a rolling average cannot be plotted, and dropping them separately from the
   // dates would desynchronise the index the scrub resolves to. One filtered array, one index.
   const series: Point[] = rows
-    .map((row) => ({ date: row.date, weight: n(row.weight_lbs), avg: n(row.rolling_7d) }))
+    .map((row) => ({
+      date: row.date,
+      weight: n(row.weight_lbs),
+      avg: n(row.rolling_7d),
+      days: row.days_in_window,
+    }))
     .filter((point): point is Point => point.avg !== null);
 
   const [active, setActive] = useState<number | null>(null);
@@ -55,6 +73,10 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
   // ago should not be the baseline a month of progress is measured from.
   const monthAgo = series.find((p) => daysBetween(p.date, latest.date) <= 30) ?? series[0];
   const change = latest.avg - monthAgo.avg;
+  // The label has to be the span actually compared, not the span asked for. With a week of
+  // history `monthAgo` is the oldest reading there is, and calling that difference "30d" claims
+  // a month of progress from two days of data.
+  const over = `${Math.round(daysBetween(monthAgo.date, latest.date))}d`;
 
   const scrubbing = active !== null;
 
@@ -73,7 +95,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
           count={scrubbing ? undefined : latest.weight}
           decimals={1}
         />
-        {scrubbing ? null : <Delta value={change} unit="lb" over="30d" />}
+        {scrubbing ? null : <Delta value={change} unit="lb" over={over} />}
       </div>
 
       <div
@@ -92,11 +114,17 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         onPointerUp={() => setActive(null)}
         onPointerCancel={() => setActive(null)}
       >
-        <Sparkline points={series.map((p) => p.avg)} height={54} activeIndex={active} />
+        <Sparkline points={series.map((p) => p.avg)} height={54} activeIndex={active} floor={MIN_SPAN_LB} />
       </div>
 
       <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-        <span>7-day avg {dec(shown.avg)}</span>
+        {/* Says the window it actually averaged. `range between interval '6 days' preceding`
+            gives a 7-day average only once seven days of weigh-ins exist; before that it is an
+            average of however many there are, and calling a mean of three readings a "7-day
+            avg" is the label doing the misleading rather than the number. */}
+        <span>
+          {shown.days >= 7 ? '7-day avg' : `${shown.days}-day avg`} {dec(shown.avg)}
+        </span>
         <span style={{ color: 'var(--ink-faint)' }}>
           {scrubbing ? 'Release to return' : `${series.length} weigh-ins / 90d`}
         </span>
