@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import type { NutritionRow } from '@/lib/backend';
 import { Swatch } from '@/components/ui';
+import { useScrubGesture } from '@/lib/useScrubGesture';
 import { dec, int, shortDay } from '@/lib/format';
 import { nowInAppTz } from '@/lib/time';
 
@@ -107,6 +108,11 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
     [data.length],
   );
 
+  // No onRelease: the selected day stays put after you lift off, so the readout above the plot
+  // keeps answering for the day you stopped on. A tap counts here for the same reason — the
+  // selection survives it, so it is a real shortcut rather than a flash.
+  const gesture = useScrubGesture({ onScrub: scrub, tapToSelect: true });
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
@@ -144,13 +150,7 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
         ref={plot}
         className="chart-in"
         style={{ height: 168, margin: '14px -6px 0', position: 'relative', touchAction: 'pan-y' }}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          scrub(e.clientX);
-        }}
-        onPointerMove={(e) => {
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) scrub(e.clientX);
-        }}
+        {...gesture}
       >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart

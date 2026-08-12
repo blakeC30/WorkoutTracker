@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { BodyweightRow } from '@/lib/backend';
 import { Section, Figure, Delta, Sparkline, Empty } from '@/components/ui';
 import { n } from '@/lib/num';
+import { useScrubGesture } from '@/lib/useScrubGesture';
 import { agoLabel, dayLabel, dec, parseDay } from '@/lib/format';
 
 /**
@@ -75,6 +76,11 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
     [series.length],
   );
 
+  // Lifting off returns to the latest reading. Bodyweight's resting state is "what do I weigh
+  // now", and leaving a month-old number as the headline invites misreading it. No tap-to-
+  // select for the same reason: the selection would be discarded on the same lift.
+  const gesture = useScrubGesture({ onScrub: scrub, onRelease: () => setActive(null) });
+
   if (series.length === 0) {
     return (
       <Section label="Bodyweight">
@@ -133,19 +139,10 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
 
       <div
         ref={plot}
-        // pan-y so a vertical flick still scrolls the page; only horizontal drags are captured.
+        // pan-y so a vertical flick scrolls the page immediately, rather than waiting to see
+        // what the gesture turns out to be. Which gesture it is gets decided in useScrubGesture.
         style={{ marginTop: 16, touchAction: 'pan-y', cursor: 'crosshair' }}
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          scrub(event.clientX);
-        }}
-        onPointerMove={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) scrub(event.clientX);
-        }}
-        // Lifting off returns to the latest reading. Bodyweight's resting state is "what do I
-        // weigh now", and leaving a month-old number as the headline invites misreading it.
-        onPointerUp={() => setActive(null)}
-        onPointerCancel={() => setActive(null)}
+        {...gesture}
       >
         <Sparkline points={line} height={54} activeIndex={active} floor={span} />
       </div>
