@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSql } from '@/lib/db';
+import { isAuthorized } from '@/lib/auth';
 import { EXPECTED_MIGRATIONS } from '@/lib/migrations-manifest';
 
 /**
@@ -41,15 +42,33 @@ async function checkMigrations(sql: ReturnType<typeof getSql>) {
 export const dynamic = 'force-dynamic';
 
 /**
- * Proves the backend can reach Neon and reports which tables exist.
+ * Two answers from one URL, depending on whether you can prove who you are.
  *
- * NOTE: this route is deliberately unauthenticated so it's easy to check with a browser
- * during Phase 1. Phase 2 puts the shared-secret check in front of it along with
- * everything else.
+ * Anonymous callers get `{ ok }` and nothing else — a genuine liveness probe (it really does
+ * round-trip to Neon) that discloses nothing. With `Authorization: Bearer <API_SECRET>` the
+ * full diagnostic comes back: database name, Postgres version, migration drift, table list.
+ *
+ * Splitting it rather than locking it outright, because the two uses are both real and only
+ * one of them is sensitive. An uptime monitor needs to poll this without holding a secret.
+ * The table list and migration filenames are a map of the schema, and version strings are
+ * how you shop for a matching CVE — that half has no business being public. Neither half is
+ * user data; there is no path from here to a single logged meal.
+ *
+ * This replaces the "deliberately unauthenticated during Phase 1" note that used to sit
+ * here, promising a Phase 2 that then took a while to arrive.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const detailed = isAuthorized({ request });
+
   try {
     const sql = getSql();
+
+    if (!detailed) {
+      // Cheapest possible proof that the connection works. Deliberately not
+      // `current_database()` — the name is a detail, and this arm returns no details.
+      await sql`select 1`;
+      return NextResponse.json({ ok: true });
+    }
 
     const [info] = await sql`
       select
@@ -93,11 +112,14 @@ export async function GET() {
       { status: migrations.status === 'pending' ? 503 : 200 },
     );
   } catch (error) {
+    // The failure arm needs the same split as the success arm. A Neon connection error names
+    // the endpoint host and sometimes the role, so handing the raw message to an anonymous
+    // caller would give away by failing what the authenticated response withholds.
+    console.error('[health] check failed:', error);
     return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
+      detailed
+        ? { ok: false, error: error instanceof Error ? error.message : 'Unknown error' }
+        : { ok: false },
       { status: 500 },
     );
   }

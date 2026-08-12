@@ -8,8 +8,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function Login({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
+export default async function Login({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; next?: string; wait?: string }>;
+}) {
   const params = await searchParams;
+  const wait = Number(params.wait);
 
   return (
     <main className="screen" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '70vh' }}>
@@ -62,7 +67,11 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
           }}
         />
 
-        {params.error ? (
+        {params.error === 'rate' ? (
+          <p className="cap" style={{ marginTop: 12, color: 'var(--signal)' }}>
+            Too many attempts. Try again in {Number.isFinite(wait) && wait > 0 ? wait : 10} min.
+          </p>
+        ) : params.error ? (
           <p className="cap" style={{ marginTop: 12, color: 'var(--signal)' }}>
             Not that one.
           </p>

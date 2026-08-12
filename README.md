@@ -49,6 +49,17 @@ See [Environments](#environments) for why there are two files and which commands
 | `npm run migrate:prod` | **production**  | The same migrations, against production. Asks for the database name first. |
 | `npm run db:target:prod` | **production** | Read-only. Confirms what the production env file points at. |
 
+`/api/health` answers twice. Anonymous callers get `{ "ok": true }` — a real liveness probe
+that round-trips to Neon and discloses nothing, safe for an uptime monitor. With the secret it
+returns the full diagnostic, including migration drift:
+
+```bash
+curl -H "Authorization: Bearer $API_SECRET" https://<backend>.vercel.app/api/health
+```
+
+Deploy order is migrate, then push, then check that — migrating first makes the brief
+disagreement `ahead` (harmless) rather than `pending` (a 503).
+
 ## Environments
 
 Since **11 August 2026** the Neon `main` branch is production: it holds real logged training,
@@ -131,12 +142,23 @@ That combination is load-bearing, not decoration:
 **Revoking a device** means changing `SESSION_SECRET` — every outstanding cookie fails its
 signature check at once. There is no session list to revoke from, by design.
 
-**What this does not do:** rate-limit. Vercel runs many instances and none share memory, so
-there is nowhere to keep a counter every attempt passes through. A failed login pauses for
-half a second; the real defence is that `auth:setup` generates a password with far more
-entropy than anyone will grind. Note also that the backend's `/api/health` is still
-unauthenticated, and the MCP endpoint carries its secret in the URL path — neither is covered
-by any of the above.
+**Failed logins are capped** at 8 per address per 10 minutes
+([`web/src/lib/rate-limit.ts`](web/src/lib/rate-limit.ts)), checked *before* the password is
+hashed. The point is not guess-prevention — a generated password will not fall to guessing at
+any rate this permits — it is that scrypt is deliberately expensive, and an unlimited number
+of anonymous requests each costing real function time is worth refusing cheaply. It also
+covers the `auth:setup -- "my own phrase"` escape hatch, where the password is whatever
+someone chose by hand.
+
+The counter is per-instance memory, so an attacker spread across Vercel instances gets a
+fresh allowance from each, and a deploy clears it. Making that airtight needs shared state
+(KV, Upstash, a table reached through the backend) — a service to configure and pay for, to
+harden a door whose key is already 139 bits. Buckets are keyed per address precisely so that
+someone else's failures can never lock *you* out.
+
+**Still uncovered:** the MCP endpoint carries its secret in the URL path rather than a header
+— deliberate, since Claude's header auth is a gated beta, and documented under
+[MCP tools](#mcp-tools).
 
 ## The dashboard
 
