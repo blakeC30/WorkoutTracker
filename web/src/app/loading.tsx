@@ -1,22 +1,15 @@
+import { Waiting } from '@/components/Waiting';
+import { dayLabel, isoWeek, toIso } from '@/lib/format';
+import { nowInAppTz } from '@/lib/time';
+
 /**
- * Shown while a screen's data is being fetched.
+ * Today's screen, waiting for its data.
  *
- * A dimmed word, not a skeleton shimmer. Skeletons animate grey boxes into the shape of
- * content that may turn out to be an empty state, which is a small lie told sixty times a
- * second — and on a personal log, empty is a routine outcome.
+ * The date and the week number are the same two values the loaded page shows, computed the
+ * same way from the same clock — so this header is not a placeholder for the real one, it IS
+ * the real one, rendered before the fetches finish.
  */
 export default function Loading() {
-  return (
-    <main className="screen">
-      <div
-        className="cap"
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
-          color: 'var(--ink-faint)',
-        }}
-      >
-        Reading
-      </div>
-    </main>
-  );
+  const now = nowInAppTz();
+  return <Waiting left={dayLabel(toIso(now))} right={`WK ${isoWeek(now)}`} />;
 }
