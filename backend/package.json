@@ -6,7 +6,9 @@
     "node": "24.x"
   },
   "scripts": {
+    "predev": "node scripts/gen-migrations-manifest.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/gen-migrations-manifest.mjs",
     "build": "next build",
     "start": "next start",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",

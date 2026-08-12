@@ -37,10 +37,31 @@ await confirmProduction('apply migrations', { direct: true });
 
 const pool = new Pool({ connectionString });
 
+// Arbitrary but fixed. Any concurrent runner picks the same number and therefore contends
+// with us rather than proceeding in parallel.
+const MIGRATION_LOCK_KEY = 4173829105n;
+
 async function main() {
   const client = await pool.connect();
 
   try {
+    // Two runners at once are already survivable — the DDL and the schema_migrations insert
+    // share a transaction, and filename is the primary key, so the loser hits a unique
+    // violation and rolls back its DDL with it. That is a happy accident of the schema
+    // rather than a decision, and it surfaces as a scary "FAILED" on a run that did nothing
+    // wrong. Take the lock instead and say plainly what happened.
+    const { rows: [lock] } = await client.query(
+      'select pg_try_advisory_lock($1) as acquired',
+      [MIGRATION_LOCK_KEY.toString()],
+    );
+    if (!lock.acquired) {
+      console.error(
+        '\nAnother migration run holds the lock on this database.\n' +
+          'Wait for it to finish, then re-run. Nothing was changed.\n',
+      );
+      process.exit(1);
+    }
+
     await client.query(`
       create table if not exists schema_migrations (
         filename   text primary key,
@@ -81,6 +102,11 @@ async function main() {
 
     console.log(`\nApplied ${pending.length} migration(s).`);
   } finally {
+    // Advisory locks are session-scoped and would be released by the disconnect below
+    // anyway. Doing it explicitly keeps the release next to the acquire, where the next
+    // person to read this will look for it.
+    await client.query('select pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY.toString()])
+      .catch(() => {});
     client.release();
     await pool.end();
   }
