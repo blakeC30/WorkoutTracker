@@ -158,24 +158,24 @@ function Grid({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }
 
       {/* The legend draws the same marks the squares do rather than describing them in words.
           Naming the rows in prose ran to two wrapped lines and still left you mapping "top row"
-          onto a 4px tick; showing a lit slot next to its label does not. */}
-      {/* Each legend label is tinted to match its own slot, so the mapping from colour to
-          meaning is stated once, in the order the slots appear. */}
-      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <LegendRow items={PATTERNS.map((p) => ({ label: p.label, tone: p.color }))} height={4} />
-        <LegendRow
-          items={MEALS.map((m) => ({ label: m.long, tone: 'var(--ink-faint)' }))}
-          height={3}
-        />
-        {/* Written out rather than passed through LegendRow: that draws a strip of slots across
-            the full 34px, and the whole point of this mark is that it is not a slot. */}
-        <div className="cap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ display: 'flex', alignItems: 'center', width: 34, flexShrink: 0 }}>
-            <WeighMark />
-          </span>
-          <span style={{ color: 'var(--ink-dim)' }}>Weighed in</span>
+          onto a 4px tick; showing a lit slot next to its label does not.
+
+          Closed by default, and a native <details> so it costs no JavaScript and no state. The
+          grid is read every day and the legend is read roughly twice — once when the screen is
+          new and once after a row is added — so it earns a line, not a permanent block above the
+          fold. Each label is tinted to match its own slot, and the rows are in the squares' own
+          top-to-bottom order, which is the whole reason this reads as a key rather than a list. */}
+      <details className="legend" style={{ marginTop: 14 }}>
+        <summary className="cap pressable">Legend</summary>
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 7, paddingBottom: 4 }}>
+          <LegendRow items={[{ label: 'Weighed in', tone: 'var(--ink-faint)' }]} height={3} />
+          <LegendRow items={PATTERNS.map((p) => ({ label: p.label, tone: p.color }))} height={4} />
+          <LegendRow
+            items={MEALS.map((m) => ({ label: m.long, tone: 'var(--ink-faint)' }))}
+            height={3}
+          />
         </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -218,27 +218,32 @@ function Square({
 
   const content = (
     <>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 3 }}>
-        <span className="mono" style={{ fontSize: 'var(--t-sm)', lineHeight: 1, color: numberTone }}>
-          {day}
-        </span>
-        {/* Sits on the date line rather than in a third slot row, because it is a different kind
-            of fact. The two rows below say what you DID; a weigh-in is a measurement you took,
-            and it has no pattern, no meal and no position to hold in a fixed sequence. Giving it
-            a slot row of its own would also have cost the squares the thing that makes them
-            legible at 6px — five positions that never move. */}
-        {weighed ? <WeighMark /> : null}
+      <span className="mono" style={{ fontSize: 'var(--t-sm)', lineHeight: 1, color: numberTone }}>
+        {day}
       </span>
 
-      {/* Slot tracks are drawn only on days that have something. Eight empty tracks on every
+      {/* Slot tracks are drawn only on days that have something. Nine empty tracks on every
           rest day would fill the month with marks that all mean "no" — the blank square already
           says that, and says it more clearly. */}
       {hasAnything ? (
         <span style={{ display: 'block' }}>
+          {/* One bar spanning the whole day rather than a slot, because there is only ever one
+              weigh-in and nothing for it to hold a position against. It sits on top so the three
+              rows read in the order a day is built: what you weighed, what you trained, what you
+              ate. Monochrome and at the meals' weight, not the patterns' — full width already
+              gives it presence, and colour in this app means movement pattern and nothing else.
+              An unweighed day keeps the empty track so the two rows below never shift up, which
+              is what lets one square's silhouette be compared with another's. */}
+          <Slots
+            items={[{ on: weighed, tone: 'var(--ink-faint)' }]}
+            height={3}
+            delay={day * 8}
+          />
+          <span style={{ display: 'block', height: 2 }} />
           <Slots
             items={PATTERNS.map((p) => ({ on: patterns.has(p.key), tone: p.color }))}
             height={4}
-            delay={day * 8}
+            delay={day * 8 + 20}
           />
           <span style={{ display: 'block', height: 2 }} />
           {/* Meals stay monochrome. Colour in this app means one thing — which movement
@@ -261,24 +266,6 @@ function Square({
       {content}
     </Link>
   );
-}
-
-/**
- * A weigh-in happened on this day. Presence only — never the number.
- *
- * The weight itself is on the day page, and on Today's chart where it can be read against the
- * days either side of it. A calendar square encodes kind and presence; "205.0" in a 48px box is
- * a magnitude nothing here can compare it to, and it would be the only figure in the grid.
- *
- * Monochrome, like the meal slots and for the same reason — colour in this app means movement
- * pattern and nothing else. It is deliberately NOT `--signal` either, since that is already the
- * outline around today and would read as a second thing being said about the same square.
- *
- * No `draw-x`: that animation is a bar growing to its length, and length is the reading it
- * carries. A mark that is either there or not has nothing to grow, so it arrives with the grid.
- */
-function WeighMark() {
-  return <span style={{ width: 4, height: 4, background: 'var(--ink-dim)', flexShrink: 0 }} />;
 }
 
 /** One legend line: the lit slots, then what each position means, in the slots' own order. */

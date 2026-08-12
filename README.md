@@ -227,17 +227,22 @@ since June.
 
 **History** is the calendar, and it encodes **kind and presence rather than magnitude** — how
 much you lifted is answered better on Today and Food, while what only a calendar can answer is
-what kind of day this was and when you last did it. Each square carries two fixed-order rows of
-slots: movement patterns on top (push · pull · legs · core · cardio) and the three anchor meals
-below. Position is the encoding, so the palette stays one colour and a leg day has a different
-silhouette from a pull day.
+what kind of day this was and when you last did it. Each square carries three fixed-order rows,
+read in the order a day is built: whether you **weighed in**, then movement patterns
+(push · pull · legs · core · cardio), then the three anchor meals. Position is the encoding, so
+the palette stays one colour and a leg day has a different silhouette from a pull day.
 
-A weigh-in is the one thing on a square that is **not** a slot — a small mark beside the date
-instead. The rows say what you *did*; a weigh-in is a measurement you took, with no pattern, no
-meal, and no position to hold in a fixed sequence. It also keeps the slot rows at five and three,
-which is the only reason they stay readable at 6px. The number itself is never shown there: a
-weight in a 48px box is a magnitude with nothing beside it to compare against, and the day page
-and Today's chart both already answer that.
+The weigh-in row is one bar spanning the whole square rather than a strip of slots, because there
+is only ever one weigh-in and nothing for it to hold a position against. An unweighed day keeps
+the empty track, so the two rows below never shift up and one square's silhouette stays
+comparable with another's. The number itself is never shown: a weight in a 48px box is a
+magnitude with nothing beside it to compare against, and the day page and Today's chart both
+already answer that. It also means a day with *only* a weigh-in is no longer a lit, tappable
+square with nothing on it.
+
+The legend below the grid is a closed `<details>` — a native disclosure, so it holds no state and
+ships no JavaScript. The grid is read every day and the legend about twice, so it earns a line
+rather than a permanent block above the fold.
 
 Below the grid, a **coverage matrix** puts every pattern against every day of the month — the
 answer to "what am I neglecting" — and a **last-trained strip** shows days since each pattern,

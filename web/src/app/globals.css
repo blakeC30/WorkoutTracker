@@ -208,6 +208,39 @@ button {
   appearance: none;
 }
 
+/* A disclosure that costs no JavaScript and holds no state — the calendar legend is the only
+   one. `<details>` is used rather than a Client Component because the whole page is otherwise
+   server-rendered, and a boolean the browser already tracks is not worth a hydration boundary.
+ *
+ * Safari draws its own triangle through ::-webkit-details-marker, which no amount of
+ * `list-style: none` removes on the iOS versions this targets — so both are set. The marker is
+ * replaced by a +/− glyph after the label: there are no icons in this app, and a disclosure with
+ * nothing to show it opens reads as a dead heading. */
+.legend > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* The summary IS the tap target, and DESIGN.md says 44px. Negative margin keeps that height
+     from pushing the grid around, since the touchable area is taller than the text. */
+  min-height: 44px;
+  margin: -11px 0;
+  color: var(--ink-faint);
+  list-style: none;
+  cursor: default;
+}
+
+.legend > summary::-webkit-details-marker {
+  display: none;
+}
+
+.legend > summary::after {
+  content: '+';
+}
+
+.legend[open] > summary::after {
+  content: '−';
+}
+
 .pressable {
   transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
 }
