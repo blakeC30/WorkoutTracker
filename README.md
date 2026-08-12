@@ -34,10 +34,24 @@ cd ../web && npm install && cp .env.example .env.local
 
 ## Backend commands
 
-| Command           | What it does                                              |
-| ----------------- | --------------------------------------------------------- |
-| `npm run dev`     | Local dev server on :3000                                  |
-| `npm run migrate` | Applies any unapplied `.sql` file in `migrations/`. Safe to re-run. |
+| Command             | What it does                                              |
+| ------------------- | --------------------------------------------------------- |
+| `npm run dev`       | Local dev server on :3000                                  |
+| `npm run migrate`   | Applies any unapplied `.sql` file in `migrations/`. Safe to re-run. |
+| `npm run seed`      | Eight weeks of invented history, every row `is_seed`. **Refuses to run against a database holding real rows** — override with `-- --force`. |
+| `npm run seed:clear`| Deletes `is_seed` rows only. Never touches anything logged through Claude. |
+| `npm run verify:e2e`| Read-only assertions for `prompts/e2e-test.md`. Expects an empty database. |
+
+### The database is production
+
+Since **11 August 2026** the Neon database holds real logged training, and the dashboard is
+deployed on Vercel against it. Do not clear it. There is no undo — journals are the record
+of what was said, and once a row is gone the only copy is a Neon branch or backup.
+
+`seed:clear` is safe by construction (`where is_seed`), and `verify:e2e` never writes. The
+things that are *not* safe are `npm run seed` without its guard, ad-hoc `delete` in a psql
+session, and running `prompts/e2e-test.md` — that one logs through Claude like you do and
+has no guard at all. All three want a scratch database instead.
 
 ## The dashboard
 

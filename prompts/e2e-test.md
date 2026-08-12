@@ -9,13 +9,21 @@ Each message is a single line in a code block: copy the whole block, paste, send
 
 ## Before you start
 
-1. **Remove and re-add the connector.** Three schema changes are stacked behind it. Testing
+> **The live database is production as of 11 August 2026.** It holds real logged training,
+> and this suite is written for an empty one — it asserts exact row counts, so real history
+> fails it, and running the prompts against it writes test rows you would then have to pick
+> out by hand. Point `DATABASE_URL` at a scratch database before running any of this.
+> `npm run seed` now refuses outright when it finds real rows; `seed:clear` only ever
+> deletes `is_seed` rows, so neither can take real data with it, but the prompts themselves
+> have no such guard — they log through Claude exactly like you do.
+
+1. **Remove and re-add the connector.** Schema changes are stacked behind it. Testing
    against a cached tool list tests the old server, and every failure would be a false one.
    Confirm by asking: *"What version does the workout-tracker server report?"* → must be
-   **0.7.0**.
+   **0.8.0**.
 2. **Re-paste `prompts/project-instructions.md`** into the project's instructions field.
-3. `cd backend && npm run seed:clear` — empties the database. Everything in it is seed data;
-   `npm run seed` puts it back afterwards.
+3. Point the connector and `backend/.env.local` at the scratch database, and confirm it is
+   empty: `npm run verify:e2e` should report 22 not-run-yet and nothing passed.
 
 Dates assume **today is Tuesday 11 August 2026**. Saturday = the 8th, Sunday = the 9th,
 Thursday = the 6th, Friday = the 7th, yesterday = the 10th. Send them all in one sitting, or
@@ -168,4 +176,6 @@ the record; the conversation is not.
 ## After
 
 `npm run verify:e2e` for the assertions, `npm run verify:e2e -- --dump` to see every row.
-Then `npm run seed:clear && npm run seed` to get the demo data back.
+
+Then point `DATABASE_URL` back at production. The test rows live in the scratch database
+and can stay there; nothing has to be cleaned up, which is the point of using one.

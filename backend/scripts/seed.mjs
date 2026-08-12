@@ -136,9 +136,35 @@ const displayName = (name) =>
 
 const pool = new Pool({ connectionString });
 
+// The database went live on 11 August 2026 — it holds real logged history now, not a
+// development fixture. Fabricated rows are marked is_seed and seed:clear takes them back
+// out, but between those two commands they are indistinguishable from real training on
+// every chart, every PR, every weekly total. Refuse by default once real rows exist.
+async function guardProductionData(client) {
+  const { rows: [r] } = await client.query(`
+    select (select count(*) from journals   where not is_seed)
+         + (select count(*) from workouts   where not is_seed)
+         + (select count(*) from meals      where not is_seed)
+         + (select count(*) from bodyweight where not is_seed) as real_rows`);
+  const realRows = Number(r.real_rows);
+  if (realRows === 0 || process.argv.includes('--force')) return;
+
+  console.error(
+    `\nRefusing to seed: this database holds ${realRows} real logged row(s).\n\n` +
+      `npm run seed writes ${WEEKS} weeks of invented training history. It is marked\n` +
+      `is_seed and npm run seed:clear removes exactly those rows — but until then it is\n` +
+      `mixed into your PRs, volume totals and calendar as though you had done it.\n\n` +
+      `If you want demo data, point DATABASE_URL at a scratch database. To override here,\n` +
+      `re-run with: npm run seed -- --force\n`,
+  );
+  process.exit(1);
+}
+
 async function main() {
   const client = await pool.connect();
   try {
+    await guardProductionData(client);
+
     await client.query('begin');
 
     const { rows: [{ today }] } = await client.query(
