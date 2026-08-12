@@ -46,7 +46,6 @@ See [Environments](#environments) for why there are two files and which commands
 | `npm run migrate`      | dev branch      | Applies any unapplied `.sql` in `migrations/`. Safe to re-run. |
 | `npm run seed`         | dev branch      | Eight weeks of invented history, every row `is_seed`. |
 | `npm run seed:clear`   | dev branch      | Deletes `is_seed` rows only.                |
-| `npm run verify:e2e`   | dev branch      | Read-only assertions for `prompts/e2e-test.md`. |
 | `npm run migrate:prod` | **production**  | The same migrations, against production. Asks for the database name first. |
 | `npm run db:target:prod` | **production** | Read-only. Confirms what the production env file points at. |
 
@@ -58,8 +57,7 @@ of what was said, and once a row is gone the only copy is a Neon branch or a bac
 
 Development happens on a **Neon dev branch** — copy-on-write, so it starts as a real-shaped
 copy of production and costs almost nothing. That is the part that matters: on a branch,
-destructive is free. Wipe it, seed it, truncate it, run the e2e prompts against it, then reset
-it from its parent in seconds.
+destructive is free. Wipe it, seed it, truncate it, then reset it from its parent in seconds.
 
 Two env files decide where a command lands, and **which one is the default is the whole
 design**:
@@ -85,10 +83,12 @@ production has to be asked for.
   guarded script refuses. That single mistake — pasting the prod string in and leaving the
   label alone — would otherwise defeat all of the above without a symptom.
 
-What is **not** guarded: `prompts/e2e-test.md`. Those prompts log through Claude exactly the
-way you do, so the only thing deciding where they land is which database the deployed backend
-behind your MCP connector is pointed at. Testing the logging flow safely needs a second
-deployment and a second connector; until that exists, the e2e suite has nowhere safe to run.
+What none of this reaches: **anything logged through Claude**. The guards above live in the
+npm scripts, and the MCP connector does not go near them — it talks to the deployed backend,
+which is pointed at production. So a message sent to the connector writes to production no
+matter what `backend/.env.local` says. Exercising the logging flow against the dev branch
+would take a second deployment and a second connector; the env split protects the scripts,
+not the conversation.
 
 ## The dashboard
 

@@ -16,8 +16,7 @@
     "db:target": "node --env-file=.env.local scripts/target.mjs",
     "db:target:prod": "node --env-file=.env.production.local scripts/target.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
-    "seed:clear": "node --env-file=.env.local scripts/seed-clear.mjs",
-    "verify:e2e": "node --env-file=.env.local scripts/verify-e2e.mjs"
+    "seed:clear": "node --env-file=.env.local scripts/seed-clear.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
