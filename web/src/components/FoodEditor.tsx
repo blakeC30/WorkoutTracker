@@ -92,7 +92,7 @@ function EditForm({
       </p>
 
       {state.error ? (
-        <p className="selectable" style={{ margin: '8px 0 0', fontSize: 'var(--t-cap)', color: 'var(--down)' }}>
+        <p className="selectable" style={{ margin: '8px 0 0', fontSize: 'var(--t-cap)', color: 'var(--fault)' }}>
           {state.error}
         </p>
       ) : null}

@@ -8,7 +8,7 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
   return (
     <main className="screen">
       <div style={{ paddingTop: 'calc(env(safe-area-inset-top) + 14px)' }}>
-        <div className="cap" style={{ color: 'var(--down)' }}>
+        <div className="cap" style={{ color: 'var(--fault)' }}>
           Screen failed
         </div>
         <p

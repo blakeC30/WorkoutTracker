@@ -86,12 +86,19 @@ Semantic colours are kept separate from both, so "good" never has to borrow the 
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--up` | `#7FA65C` | Moss. Increase — used neutrally, not as praise |
-| `--down` | `#C4553D` | Rust. Decrease |
+| `--fault` | `#C4553D` | Rust. Something is broken: a failed section, a rejected edit |
 | `--flag` | `#C9A227` | Low-confidence data needing review |
 
-Direction is not judgement. Bodyweight down is `--down` because the number went down, not
-because that is bad. The app reports; it does not cheer.
+**Direction is never coloured.** A change is a triangle and a sign, in plain ink, whichever way
+it went.
+
+This replaced a moss `--up` and a rust `--down`, and the note that used to sit here claimed they
+were read as direction rather than judgement. They were not. Green-up and red-down mean good and
+bad no matter what a palette intends, and the figure they mostly coloured was bodyweight — where
+neither direction is either, and where the app showed rust for a cut and moss for a bulk. A
+convention that strong cannot be opted out of by declaring it; it can only be not used.
+
+The app reports; it does not cheer, and it does not tut.
 
 ### The macro ramp
 

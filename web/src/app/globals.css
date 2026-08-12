@@ -16,8 +16,18 @@
   --signal: #e0913a;
   --signal-low: #7a5124;
 
-  --up: #7fa65c;
-  --down: #c4553d;
+  /* Something is broken (--fault) or something is uncertain (--flag). Neither is a direction.
+   *
+   * There used to be a --up moss and a --down rust for increase and decrease, with a claim
+   * attached that they were read as direction rather than as judgement. They were not, and
+   * they could not be: green-up and red-down mean good and bad no matter what a palette
+   * intends, and the number they mostly coloured was bodyweight, where neither direction is
+   * either. Direction is now the triangle and the sign, and nothing in this app colours it.
+   *
+   * --fault kept the rust value and lost the name, since every surviving use was an error —
+   * a failed section, a rejected edit, the crash screen. A token called "down" that only
+   * ever means "broken" is a name waiting to be mis-applied by whoever reads it next. */
+  --fault: #c4553d;
   --flag: #c9a227;
 
   /* Movement patterns — the app's one categorical palette.

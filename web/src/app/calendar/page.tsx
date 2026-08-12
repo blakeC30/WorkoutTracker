@@ -445,11 +445,13 @@ function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
       <div style={{ display: 'flex', gap: 26 }}>
         <Stat label="Trained" value={`${trained}`} unit={`/ ${elapsed}`} />
         <Stat label="Food logged" value={`${fed}`} unit={`/ ${elapsed}`} />
+        {/* No tone. The sign in front of the number already says which way it went, and
+            colouring the direction made a month of gaining read as an error and a month of
+            losing read as a reward — a judgement this screen has no business making. */}
         <Stat
           label="Weight"
           value={weightChange === null ? '—' : `${weightChange > 0 ? '+' : ''}${dec(weightChange)}`}
           unit={weightChange === null ? undefined : 'LB'}
-          tone={weightChange === null ? undefined : weightChange > 0 ? 'var(--up)' : 'var(--down)'}
         />
       </div>
     </Section>

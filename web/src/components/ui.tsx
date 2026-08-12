@@ -101,11 +101,10 @@ export function Figure({
 }
 
 /**
- * A signed change.
+ * A signed change, in one ink. The triangle says which way; the colour says nothing.
  *
- * Colour follows DIRECTION, not approval: down is rust because the number went down, not
- * because down is bad. Bodyweight, calories and volume all move both ways for good reasons,
- * and an app that decided which was praiseworthy would be wrong half the time.
+ * Bodyweight, calories and volume all move both ways for good reasons, and an app that
+ * decided which was praiseworthy would be wrong half the time — so it does not decide.
  */
 export function Delta({
   value,
@@ -127,7 +126,20 @@ export function Delta({
 }) {
   if (value === null) return null;
   const rounded = Math.abs(value) < 0.05 ? 0 : value;
-  const tone = rounded > 0 ? 'var(--up)' : rounded < 0 ? 'var(--down)' : 'var(--ink-faint)';
+  /*
+   * Direction is carried by the glyph, never by colour.
+   *
+   * This used to be moss for up and rust for down, with a note in DESIGN.md insisting they
+   * were "used neutrally, not as praise". That was a claim the colours could not honour:
+   * green-up and red-down are read as good and bad whatever the palette intends, and on the
+   * reading this component is used for most — bodyweight — neither direction is either. A
+   * cut showed rust and a bulk showed moss, and the app was congratulating or scolding a
+   * number it has no opinion about.
+   *
+   * The triangle already says which way, so nothing is lost. Zero stays faint because it is
+   * genuinely less to report, not because standing still is worse.
+   */
+  const tone = rounded === 0 ? 'var(--ink-faint)' : 'var(--ink)';
   const arrow = rounded > 0 ? '▲' : rounded < 0 ? '▼' : '–';
   const magnitude = Math.abs(rounded);
 
@@ -314,8 +326,8 @@ export function Empty({ children }: { children: ReactNode }) {
 /** A section that failed. The rest of the screen still renders. */
 export function Fault({ error }: { error: string }) {
   return (
-    <div style={{ borderLeft: '2px solid var(--down)', paddingLeft: 12, margin: '4px 0 8px' }}>
-      <div className="cap" style={{ color: 'var(--down)' }}>
+    <div style={{ borderLeft: '2px solid var(--fault)', paddingLeft: 12, margin: '4px 0 8px' }}>
+      <div className="cap" style={{ color: 'var(--fault)' }}>
         Unavailable
       </div>
       <p className="selectable" style={{ margin: '4px 0 0', color: 'var(--ink-dim)', fontSize: 'var(--t-sm)' }}>
