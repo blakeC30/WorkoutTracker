@@ -28,6 +28,11 @@ export function TabBar() {
     (tab) => pathname === tab.href || (tab.href !== '/' && pathname.startsWith(`${tab.href}/`)),
   );
 
+  // Nowhere to go from the login screen — every tab would bounce straight back here. Hiding
+  // it also keeps the one unauthenticated page from looking like the app with the data
+  // missing, which reads as broken rather than as locked.
+  if (pathname === '/login') return null;
+
   return (
     <nav
       style={{

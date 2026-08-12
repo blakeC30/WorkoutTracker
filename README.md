@@ -90,6 +90,54 @@ matter what `backend/.env.local` says. Exercising the logging flow against the d
 would take a second deployment and a second connector; the env split protects the scripts,
 not the conversation.
 
+## Dashboard login
+
+One password, one cookie, no user table — there is exactly one reader, so a session is only
+ever the claim *"whoever holds this cookie typed the password once"*.
+
+```bash
+cd web && npm run auth:setup          # invents a password, prints the two values to set
+```
+
+Put `SESSION_SECRET` and `AUTH_PASSWORD_HASH` in `web/.env.local` **and** in the web project's
+Vercel environment variables. Without them every request throws — a missing secret must never
+degrade to an unlocked door.
+
+**Two layers, and only one of them is the boundary.**
+[`web/src/proxy.ts`](web/src/proxy.ts) redirects anyone without a session to `/login`. That is
+an *optimistic* check in Next's own terms: a matcher is a path regex, and the failure mode of
+a regex is a path nobody thought of. The enforcing check is in
+[`web/src/lib/backend.ts`](web/src/lib/backend.ts), the single module that can reach the
+backend at all — a route the matcher misses still fetches nothing. `proxy.ts` buys the
+difference between a locked door and a wall: a login form instead of a broken page.
+
+It is `proxy.ts`, not `middleware.ts` — the middleware convention is deprecated in Next 16.
+
+**Staying signed in on the iPhone home screen.** The cookie is `HttpOnly`, `Secure`,
+`SameSite=Lax`, and set by the server, with a 400-day max age (the ceiling browsers allow).
+That combination is load-bearing, not decoration:
+
+- Safari's ITP expires *script-writable* storage after seven idle days — `localStorage`,
+  IndexedDB, and anything written via `document.cookie`. A token kept in any of those would
+  sign you out roughly weekly. Cookies set in a `Set-Cookie` response header are exempt.
+- **Sign in once from the home-screen app itself.** iOS gives a standalone web app its own
+  storage container, so a session established in Safari does not necessarily carry over.
+- The login form carries a hidden `username` field. There is only one user, but iCloud
+  Keychain offers to save a password far more reliably when it has something to file it
+  under — which is what makes Face ID autofill work on the rare occasions you do sign in.
+- `/icon`, `/apple-icon` and `/manifest.webmanifest` are deliberately outside the matcher. iOS
+  fetches all three while installing to the home screen, before any session exists.
+
+**Revoking a device** means changing `SESSION_SECRET` — every outstanding cookie fails its
+signature check at once. There is no session list to revoke from, by design.
+
+**What this does not do:** rate-limit. Vercel runs many instances and none share memory, so
+there is nowhere to keep a counter every attempt passes through. A failed login pauses for
+half a second; the real defence is that `auth:setup` generates a password with far more
+entropy than anyone will grind. Note also that the backend's `/api/health` is still
+unauthenticated, and the MCP endpoint carries its secret in the URL path — neither is covered
+by any of the above.
+
 ## The dashboard
 
 Four screens — **Today**, **History**, **Exercises**, **Food** — built for one device: an iPhone 13

@@ -5,6 +5,7 @@ import { WeightChart } from '@/components/WeightChart';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
 import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
+import { signOut } from '@/app/login/actions';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -60,6 +61,18 @@ export default async function Today() {
           <Review rows={review.rows} />
         </Reveal>
       ) : null}
+
+      {/* Bottom of the last screen, deliberately unremarkable. Signing out means typing the
+          password again on a phone, so it should be findable and never nearly-tapped. */}
+      <form action={signOut} style={{ marginTop: 48, marginBottom: 24 }}>
+        <button
+          type="submit"
+          className="cap"
+          style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--ink-faint)' }}
+        >
+          Sign out
+        </button>
+      </form>
     </main>
   );
 }

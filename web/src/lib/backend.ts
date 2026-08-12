@@ -1,4 +1,7 @@
 import 'server-only';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { SESSION_COOKIE, verifySessionToken } from './session';
 
 /**
  * The only thing in web/ that knows the API secret.
@@ -7,10 +10,26 @@ import 'server-only';
  * reached from a Client Component, so the rule "the browser never sees the secret" is enforced
  * by the compiler rather than by remembering. Every screen fetches here in a Server Component
  * and passes plain JSON down as props.
+ *
+ * Being the only module that can reach the backend also makes it the right place to enforce
+ * the session. `proxy.ts` redirects unauthenticated visitors, but a path regex is a list of
+ * things someone remembered, and this is a chokepoint: a route the matcher misses still
+ * cannot read a single row, because reading one means calling through here.
  */
 
 const BACKEND_URL = process.env.BACKEND_URL;
 const API_SECRET = process.env.API_SECRET;
+
+/**
+ * Throws (as a redirect) unless the caller holds a valid session.
+ *
+ * `redirect` works by throwing, so this must be called BEFORE any try/catch — inside one, the
+ * catch swallows the redirect and turns a security check into an error message.
+ */
+async function requireSession(): Promise<void> {
+  const store = await cookies();
+  if (!verifySessionToken(store.get(SESSION_COOKIE)?.value)) redirect('/login');
+}
 
 /**
  * Either the rows, or the reason there aren't any. Deliberately not a thrown error: a screen
@@ -23,6 +42,8 @@ export type Result<T> = { ok: true; rows: T[] } | { ok: false; error: string };
 export type One<T> = { ok: true; row: T } | { ok: false; error: string };
 
 async function query<T>(path: string, params: Record<string, string | number> = {}): Promise<Result<T>> {
+  await requireSession();
+
   if (!BACKEND_URL || !API_SECRET) {
     return { ok: false, error: 'BACKEND_URL and API_SECRET are not set in web/.env.local' };
   }
@@ -257,6 +278,10 @@ export async function updateFood(input: {
   fat_g?: number;
   confidence?: 'high' | 'medium' | 'low';
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  // A write, and reachable as a Server Action — which is its own POST endpoint that a path
+  // matcher does not necessarily cover. The check matters more here than on any read.
+  await requireSession();
+
   if (!BACKEND_URL || !API_SECRET) {
     return { ok: false, error: 'BACKEND_URL and API_SECRET are not set' };
   }
