@@ -52,6 +52,12 @@ export const config = {
    * would have fetched the login page as an image and fallen back to a screenshot of the
    * page. The manifest is public for the same reason — iOS reads it while installing, long
    * before anyone has signed in. It names the app and nothing else.
+   *
+   * `apple-splash` joins them: iOS fetches launch images at install time with no session, so
+   * a redirect there caches an HTML page as the splash. The images are four rectangles on a
+   * dark ground and disclose nothing.
    */
-  matcher: ['/((?!login|icon|apple-icon|manifest\\.webmanifest|favicon\\.ico|_next/static|_next/image).*)'],
+  matcher: [
+    '/((?!login|icon|apple-icon|apple-splash|manifest\\.webmanifest|favicon\\.ico|_next/static|_next/image).*)',
+  ],
 };

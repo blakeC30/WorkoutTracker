@@ -181,6 +181,25 @@ One question per tab: *now / over time / exercises / food*. There used to be a f
 eight-week ledger answered the same question as the month grid at a different zoom; it now sits
 below that grid on History instead.
 
+### The launch screen
+
+Cold-launching from the home screen used to show **white** until the first paint. The manifest's
+`background_color` does not prevent that — it is what Chrome on Android builds a splash from, and
+iOS has never read it. iOS wants `apple-touch-startup-image`, one per device geometry, and matches
+on **exact pixel dimensions**: a near miss is silently ignored and you are back to white.
+
+[`web/src/lib/splash.ts`](web/src/lib/splash.ts) holds the device list and derives both the media
+queries and the pixel sizes, so the two cannot disagree.
+[`/apple-splash/[size]`](web/src/app/apple-splash/) renders the icon's mark on `#121110` at the
+requested size, generated the same way as `icon.tsx` rather than committed as thirteen PNGs. Only
+advertised sizes render; anything else is a 404, since an arbitrary `WxH` from a URL is an
+invitation to ask for 30000x30000. The route sits outside the proxy matcher because iOS fetches
+launch images at install time with no session.
+
+> **After deploying this, delete the home-screen icon and add it again.** iOS caches launch
+> images when the app is installed and does not go looking for new ones. Without a re-add you
+> will keep seeing the white screen and conclude, reasonably but wrongly, that it did not work.
+
 **Today** opens with how long since each movement pattern was last trained, because that is the
 only thing on the screen that says what to *do*. Volume below it is grouped by pattern, and
 patterns with no tonnage — cardio, planks — are reported in minutes and miles rather than
