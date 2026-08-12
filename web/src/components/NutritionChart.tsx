@@ -168,6 +168,20 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
             // the plot, not values locked inside the SVG. The chart draws the shape; the
             // numbers are already readable without it.
             accessibilityLayer={false}
+            /*
+             * The chart draws; it does not listen.
+             *
+             * Recharts tracks the pointer itself and keeps its own notion of which index is
+             * active — separate from `selected`, and updated on contact rather than on the
+             * deliberate drag the wrapper waits for. Two active indices on one plot is what
+             * put a lit bar on one day and a marked protein point on another, and no amount
+             * of turning off individual highlights fixes the cause of that.
+             *
+             * With pointer events off the surface, every touch lands on the wrapper div and
+             * `selected` is the only state there is. Nothing is lost: the wrapper is the
+             * element the scrub gesture reads, and events from children bubble to it anyway.
+             */
+            style={{ pointerEvents: 'none' }}
           >
             {/* Both axes exist for scaling; only the date axis is drawn. Gridlines are the
                 reference line below and nothing else — a grid of boxes is a chart cliché that
@@ -199,6 +213,10 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
               radius={0}
               maxBarSize={14}
               isAnimationActive={false}
+              // The bar's equivalent of activeDot — Recharts 3 restyles whichever bar it
+              // thinks is active. `shape` below already decides how a bar looks, and it reads
+              // `selected`, which is the one source of truth for that.
+              activeBar={false}
               shape={(props: unknown) => {
                 const { x, y, width, height, index } = props as {
                   x: number;
@@ -246,6 +264,11 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
               stroke="var(--ink-dim)"
               strokeWidth={1.25}
               dot={false}
+              // Recharts marks the active point with a circle by default. Belt and braces
+              // alongside pointer-events above: this is the thing that was drawing it, and
+              // saying so explicitly means a future change to that style cannot bring it back.
+              // The selected day's protein is reported as text above the plot regardless.
+              activeDot={false}
               connectNulls={false}
               isAnimationActive={false}
             />
