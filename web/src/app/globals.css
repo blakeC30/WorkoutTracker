@@ -65,6 +65,30 @@ html {
   background: var(--ground);
   /* Landscape rotation would stretch a layout built for one width. */
   -webkit-text-size-adjust: 100%;
+
+  /* No scroll indicator.
+   *
+   * In standalone mode there is no browser chrome for it to belong to, so it reads as part of
+   * the app — a pale bar that appears at the right edge, over the content, every time a thumb
+   * moves. On a design made of hairlines it is the heaviest vertical line on the screen, and
+   * it is the only one that means nothing.
+   *
+   * Two declarations because they cover different eras of WebKit and neither is redundant.
+   * `scrollbar-width` is the standard property and the one that reaches the iOS overlay
+   * indicator; Safari only implemented it in 18.2, so it does nothing on an older phone.
+   * `::-webkit-scrollbar` is the old vendor mechanism, which is what those older versions
+   * listen to. Firefox reads the first; Chrome and desktop Safari read the second.
+   *
+   * Nothing is lost by hiding it here. The indicator is a position cue, and every screen in
+   * this app is a short column with a fixed tab bar underneath — there is no long document to
+   * lose your place in, and no horizontal scrolling anywhere to discover.
+   */
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }
 
 body {
