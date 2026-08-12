@@ -91,8 +91,8 @@ export function useScrubGesture({
   );
 
   const finish = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
-      if (intent.current === 'undecided' && tapToSelect) onScrub(event.clientX);
+    (event: PointerEvent<HTMLDivElement>, tapCounts: boolean) => {
+      if (intent.current === 'undecided' && tapCounts) onScrub(event.clientX);
       if (intent.current === 'scrub') onRelease?.();
 
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -101,15 +101,32 @@ export function useScrubGesture({
       intent.current = 'undecided';
       start.current = null;
     },
-    [onRelease, onScrub, tapToSelect],
+    [onRelease, onScrub],
   );
 
   return {
     onPointerDown,
     onPointerMove,
-    onPointerUp: finish,
-    // Fired when the browser claims the gesture for a scroll. Nothing was scrubbed in that
-    // case, so this only has to clear the bookkeeping.
-    onPointerCancel: finish,
+
+    /** Finger lifted. If it never moved, that was a tap. */
+    onPointerUp: useCallback(
+      (event: PointerEvent<HTMLDivElement>) => finish(event, tapToSelect),
+      [finish, tapToSelect],
+    ),
+
+    /*
+     * The browser took the gesture for a scroll.
+     *
+     * NEVER a tap, whatever `tapToSelect` says — and this is the whole reason cancel is
+     * handled separately from release. iOS claims a vertical pan before any pointermove
+     * reaches this hook, so the intent is still 'undecided' when cancel arrives: identical,
+     * from in here, to a finger that touched and lifted without moving. Treating the two the
+     * same meant every attempt to scroll past the chart selected whatever day was under the
+     * thumb. The distinction is not in the coordinates, it is in which event fired.
+     */
+    onPointerCancel: useCallback(
+      (event: PointerEvent<HTMLDivElement>) => finish(event, false),
+      [finish],
+    ),
   };
 }
