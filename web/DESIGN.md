@@ -96,18 +96,25 @@ because that is bad. The app reports; it does not cheer.
 ### The macro ramp
 
 Macros are the one place a second dimension is distinguished by colour, and it is a **lightness
-ramp of a single warm neutral**, not a second palette — so the categorical budget is still spent
-entirely on movement pattern.
+ramp of a single warm golden stone**, not a second palette — so the categorical budget is still
+spent entirely on movement pattern.
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--macro-protein` | `#CDC0AB` | Protein. The lightest step |
-| `--macro-carbs` | `#A2937C` | Carbs |
-| `--macro-fat` | `#7B7062` | Fat. The darkest step, and still above `--ink-faint` |
+| `--macro-protein` | `#D4CAAF` | Protein. The lightest step |
+| `--macro-carbs` | `#B6A47C` | Carbs |
+| `--macro-fat` | `#8C784F` | Fat. The darkest step, and still above `--ink-faint` |
 
 Why a ramp rather than three hues: adjacent segments of a split bar separate better by lightness
 than by hue at equal lightness, and a ramp survives any colour-vision deficiency by construction
-rather than by luck.
+rather than by luck. Six hues are already spoken for — five patterns plus the amber chrome — so
+three more would land beside push and legs on the wheel and cost the pattern palette its meaning.
+
+**The chroma is load-bearing and was got wrong once.** The first version of this ramp was
+near-neutral and read as three greys: drab, and out of character in an app whose personality is
+amber on warm charcoal. These carry real warmth instead. What keeps them from *becoming* amber is
+hue and saturation together — they sit around 40–44° against the signal's 31°, at under half
+its saturation, so they read as stone and gold rather than as a dimmer accent.
 
 **Calories are amber and are not a fourth macro.** They are the axis these three are drawn on —
 protein and carbs ×4, fat ×9 — so the nutrition chart's bars are `--signal-low`, going `--signal`

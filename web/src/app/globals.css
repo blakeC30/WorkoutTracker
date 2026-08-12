@@ -43,11 +43,18 @@
 
   /* Macros — a lightness ramp, NOT a second categorical palette.
    *
-   * Three steps of one warm neutral rather than three hues, for three reasons. Adjacent
+   * Three steps of one warm golden stone rather than three hues, for three reasons. Adjacent
    * segments of a split bar separate better by lightness than by hue at the same lightness;
    * a ramp is legible under any colour-vision deficiency by construction rather than by
    * luck; and it spends nothing from the categorical budget, so movement pattern stays the
    * only dimension in this app that colour means.
+   *
+   * The chroma is deliberate and was got wrong once. The first version of this ramp was
+   * near-neutral and read as three greys — drab, and out of character in an app whose whole
+   * personality is amber on warm charcoal. These carry real warmth. What they must not do is
+   * become amber, which is handled by hue and saturation together: they sit around 40-44
+   * degrees against the signal's 31, at under half its saturation, so they read as stone
+   * and gold rather than as a dimmer version of the accent.
    *
    * None of them is amber, and that is the load-bearing part. CALORIES are amber — the
    * nutrition chart's bars are --signal-low, going --signal when selected — and calories are
@@ -65,9 +72,9 @@
    * bar's segments slightly better and make one of the three letters unreadable, which is a
    * bad trade in a place where colour is redundant and the letter is the actual label.
    */
-  --macro-protein: #cdc0ab;
-  --macro-carbs: #a2937c;
-  --macro-fat: #7b7062;
+  --macro-protein: #d4caaf;
+  --macro-carbs: #b6a47c;
+  --macro-fat: #8c784f;
 
   --gutter: 20px;
   --tabbar: 52px;
