@@ -42,6 +42,20 @@ export const metadata: Metadata = {
   },
   // Nothing here should ever be indexed; it is one person's bodyweight.
   robots: { index: false, follow: false },
+  other: {
+    /*
+     * Next 16 renders `appleWebApp.capable: true` as the STANDARD `mobile-web-app-capable`
+     * and no longer emits Apple's legacy name. Standalone launch still works, because iOS
+     * 16.4+ takes that from the manifest's `display` — but `apple-touch-startup-image` is
+     * older machinery than the manifest and still gates on the legacy meta. Without this
+     * line iOS ignored all thirteen launch images and painted white, which is exactly what
+     * it looks like when the images are wrong, so the tags were never the suspect.
+     *
+     * Emitting both names is correct rather than belt-and-braces: they are two generations
+     * of the same declaration and neither implies the other here.
+     */
+    'apple-mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {

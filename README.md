@@ -196,6 +196,15 @@ advertised sizes render; anything else is a 404, since an arbitrary `WxH` from a
 invitation to ask for 30000x30000. The route sits outside the proxy matcher because iOS fetches
 launch images at install time with no session.
 
+The links alone were not enough. Next 16 renders `appleWebApp.capable: true` as the **standard**
+`mobile-web-app-capable` and no longer emits Apple's legacy `apple-mobile-web-app-capable`.
+Standalone launch still worked — iOS 16.4+ takes that from the manifest's `display` — but
+`apple-touch-startup-image` predates the manifest and still gates on the legacy meta, so iOS
+ignored all thirteen images and painted white. That is indistinguishable from the images being
+wrong, which is why the tags were never the suspect. The layout adds the legacy name back via
+`metadata.other`; both are emitted, and they are two generations of the same declaration
+rather than a duplicate.
+
 > **After deploying this, delete the home-screen icon and add it again.** iOS caches launch
 > images when the app is installed and does not go looking for new ones. Without a re-add you
 > will keep seeing the white screen and conclude, reasonably but wrongly, that it did not work.
