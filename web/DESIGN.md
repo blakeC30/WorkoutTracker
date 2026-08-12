@@ -182,13 +182,7 @@ routine — a cleared database hits all three at once:
   never an illustration.
 - **Error** — a rule, the word, and the reason. The section fails alone; the rest of the screen
   still renders.
-- **Loading** — the screen's true header, then a static dimmed label. No skeleton shimmer.
-  The header is not a placeholder: `Food` is always `Food`, and today's date and week come
-  from the clock rather than the backend, so it is the same header the loaded screen renders
-  and it does not move when the data lands. Routes whose header depends on something
-  `loading.tsx` is not given — the month behind `?m=`, a date or exercise name in the path —
-  show the label alone. Guessing a header and correcting it is the same lie as a skeleton,
-  told once instead of sixty times a second.
+- **Loading** — a static dimmed label. No skeleton shimmer.
 
 Also: hover is irrelevant here, but `:active` and `:focus-visible` are not. Every pressable
 thing has both.
