@@ -31,5 +31,20 @@ try {
   }
 } catch (err) {
   console.error(`\nCould not connect: ${err.message}`);
+  // Neon branches can be created with an expiry, and an expired branch is deleted outright —
+  // its endpoint host stops resolving and every script here fails at once. The tempting fix
+  // in that moment is to paste production back into .env.local, which quietly undoes the
+  // entire arrangement, so say the other thing out loud before anyone thinks of it. The
+  // cross-check in lib/env.mjs would refuse that paste anyway; this is the explanation that
+  // makes the refusal make sense.
+  if (describeTarget().appEnv !== 'production') {
+    console.error(
+      `\nIf this was an expiring Neon branch, it may have been deleted. Create a new branch\n` +
+        `from main and paste ITS connection string here — a re-created branch gets a new\n` +
+        `endpoint host, so the old string will not come back.\n\n` +
+        `Do not point .env.local at production to get unstuck. The guards will refuse it,\n` +
+        `and that refusal is the feature.\n`,
+    );
+  }
   process.exit(1);
 }
