@@ -111,7 +111,7 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
   // No onRelease: the selected day stays put after you lift off, so the readout above the plot
   // keeps answering for the day you stopped on. A tap counts here for the same reason — the
   // selection survives it, so it is a real shortcut rather than a flash.
-  const gesture = useScrubGesture({ onScrub: scrub, tapToSelect: true });
+  const gesture = useScrubGesture({ ref: plot, onScrub: scrub, tapToSelect: true });
 
   return (
     <div>

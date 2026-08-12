@@ -79,7 +79,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
   // Lifting off returns to the latest reading. Bodyweight's resting state is "what do I weigh
   // now", and leaving a month-old number as the headline invites misreading it. No tap-to-
   // select for the same reason: the selection would be discarded on the same lift.
-  const gesture = useScrubGesture({ onScrub: scrub, onRelease: () => setActive(null) });
+  const gesture = useScrubGesture({ ref: plot, onScrub: scrub, onRelease: () => setActive(null) });
 
   if (series.length === 0) {
     return (

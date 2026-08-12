@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
-import type { PointerEvent } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { PointerEvent, RefObject } from 'react';
 
 /**
  * Tells a scrub apart from a page scroll, for the charts you drag a finger across.
@@ -57,10 +57,13 @@ const SCRUB_BIAS = 1.7;
 type Intent = 'undecided' | 'scrub' | 'scroll';
 
 export function useScrubGesture({
+  ref,
   onScrub,
   onRelease,
   tapToSelect = false,
 }: {
+  /** The element the gesture happens on. Needed to lock scrolling during a scrub. */
+  ref: RefObject<HTMLElement | null>;
   /** Called with the pointer's clientX for every frame of a scrub. */
   onScrub: (clientX: number) => void;
   /** Called when a scrub ends. Omit where the selection should persist. */
@@ -76,6 +79,35 @@ export function useScrubGesture({
 }) {
   const start = useRef<{ x: number; y: number } | null>(null);
   const intent = useRef<Intent>('undecided');
+
+  /*
+   * Once a scrub is underway, the page must not scroll. A finger reading across the plot
+   * never travels perfectly flat, and every pixel of vertical drift used to slide the page —
+   * so the thing you were pointing at moved while you were pointing at it.
+   *
+   * `touch-action: pan-y` cannot express this. It is latched when the touch begins and it
+   * permits vertical panning for the WHOLE gesture, not just its opening. Capturing the
+   * pointer does not help either: capture governs which element receives events, and native
+   * scrolling is not an event anyone receives. The only thing that stops it is preventDefault
+   * on a touchmove — and React's own onTouchMove cannot, because React registers touchmove
+   * passively at the root, where preventDefault is ignored. Hence a real listener, bound to
+   * the element, explicitly non-passive.
+   *
+   * Only while scrubbing. Blocking earlier — before the gesture has declared itself — would
+   * make the page feel stuck exactly when someone is trying to scroll past the chart, which
+   * is the complaint this whole hook exists to answer.
+   */
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const lockWhileScrubbing = (event: TouchEvent) => {
+      if (intent.current === 'scrub') event.preventDefault();
+    };
+
+    element.addEventListener('touchmove', lockWhileScrubbing, { passive: false });
+    return () => element.removeEventListener('touchmove', lockWhileScrubbing);
+  }, [ref]);
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     // Deliberately no capture and no scrub here. Contact alone means nothing yet.
