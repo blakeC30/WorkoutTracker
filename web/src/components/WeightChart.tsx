@@ -118,7 +118,15 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
    * chart scales with the data exactly as before and merely stops short of the edges.
    */
   const line = series.map((p) => p.avg);
-  const spread = Math.max(...line) - Math.min(...line);
+  // The weigh-ins themselves, behind the smoothed line.
+  //
+  // Without them the chart could show a fall on a day the scale went up — which is not a
+  // fault, it is what a rolling average does when the reading lands below the running mean,
+  // but it is unreadable unless the reading is on the screen too. Drawing both makes the two
+  // facts visible at once: the point rose, the trend eased.
+  const weighIns = series.map((p) => p.weight);
+  const values = [...line, ...weighIns.filter((v): v is number => v !== null)];
+  const spread = Math.max(...values) - Math.min(...values);
   const span = Math.max(MIN_SPAN_LB, spread * HEADROOM);
 
   return (
@@ -159,7 +167,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         onPointerUp={() => setActive(null)}
         onPointerCancel={() => setActive(null)}
       >
-        <Sparkline points={line} height={54} activeIndex={active} floor={span} />
+        <Sparkline points={line} ghost={weighIns} height={54} activeIndex={active} floor={span} />
       </div>
 
       <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
