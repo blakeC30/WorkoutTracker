@@ -215,8 +215,25 @@ function Ready({ result }: { result: Awaited<ReturnType<typeof getRecency>> }) {
     );
   }
 
-  // Ordered longest-gap-first by the query, so the thing most worth doing is leftmost.
-  const overdue = result.rows.filter((r) => r.days_since === null || r.days_since >= 7);
+  /*
+   * Fixed pattern order, matching Volume below and the coverage matrix on History.
+   *
+   * The query returns these sorted by longest gap first, which is the right order for the MCP
+   * tool that shares it — a model asking what to train next wants the most neglected pattern
+   * first. It is the wrong order for a row of five columns you read every day: the labels
+   * swapped places whenever anything was logged, so recognising a column meant reading it
+   * rather than knowing where it lives. Position is the fastest channel on this screen and it
+   * was being spent on a ranking that the numbers already state.
+   *
+   * Nothing about urgency is lost. The day count is the reading, and overdue columns are
+   * flagged by colour and counted in the aside.
+   */
+  const byPattern = new Map(result.rows.map((r) => [r.pattern, r]));
+  const ordered = PATTERN_ROWS.map((p) => byPattern.get(p.key)).filter(
+    (row): row is RecencyRow => row !== undefined,
+  );
+
+  const overdue = ordered.filter((r) => r.days_since === null || r.days_since >= 7);
 
   return (
     <Section
@@ -224,7 +241,7 @@ function Ready({ result }: { result: Awaited<ReturnType<typeof getRecency>> }) {
       aside={overdue.length > 0 ? `${overdue.length} over a week` : 'all within a week'}
     >
       <div style={{ display: 'flex', gap: 10 }}>
-        {result.rows.map((row) => (
+        {ordered.map((row) => (
           <Gap key={row.pattern} row={row} />
         ))}
       </div>
