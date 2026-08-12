@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { signIn } from './actions';
+import { authDisabled } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +17,22 @@ export default async function Login({
 }) {
   const params = await searchParams;
   const wait = Number(params.wait);
+
+  // Nothing here is reachable by redirect when the login is off, but the URL still is — and
+  // a fresh clone with AUTH_DISABLED set has no AUTH_PASSWORD_HASH to check a password
+  // against, so submitting this form would throw. Say what is going on instead.
+  if (authDisabled()) {
+    return (
+      <main className="screen" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '70vh' }}>
+        <div className="cap" style={{ color: 'var(--ink-faint)', marginBottom: 12 }}>
+          Login is off in this environment
+        </div>
+        <Link href="/" className="cap" style={{ color: 'var(--signal)' }}>
+          Go to the log
+        </Link>
+      </main>
+    );
+  }
 
   return (
     <main className="screen" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '70vh' }}>

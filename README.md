@@ -142,6 +142,18 @@ That combination is load-bearing, not decoration:
 **Revoking a device** means changing `SESSION_SECRET` — every outstanding cookie fails its
 signature check at once. There is no session list to revoke from, by design.
 
+**Turning it off locally.** `AUTH_DISABLED=true` in `web/.env.local` skips the login, and with
+it set you do not need `SESSION_SECRET` or `AUTH_PASSWORD_HASH` at all — a fresh clone runs
+`npm run dev` without generating anything.
+
+It takes two independent things to be true, and only one of them is a variable anyone can set:
+`NODE_ENV` must not be `production` **and** the flag must be explicitly `true` or `1`. The
+first is the one doing the work — Next hardcodes production into `next build` output, so it
+describes how the code was compiled rather than what a label claims. Setting `AUTH_DISABLED`
+on Vercel does nothing except print a line in the logs saying it was ignored. A local
+`npm run start` is a production build too, so it keeps asking for the password; that is the
+point of running it.
+
 **Failed logins are capped** at 8 per address per 10 minutes
 ([`web/src/lib/rate-limit.ts`](web/src/lib/rate-limit.ts)), checked *before* the password is
 hashed. The point is not guess-prevention — a generated password will not fall to guessing at

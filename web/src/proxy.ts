@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { SESSION_COOKIE, verifySessionToken } from '@/lib/session';
+import { SESSION_COOKIE, hasValidSession } from '@/lib/session';
 
 /**
  * Sends anyone without a valid session to /login.
@@ -18,7 +18,7 @@ import { SESSION_COOKIE, verifySessionToken } from '@/lib/session';
  * unauthenticated request renders a broken page, and with it you get a login form.
  */
 export function proxy(request: NextRequest) {
-  if (verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value)) {
+  if (hasValidSession(request.cookies.get(SESSION_COOKIE)?.value)) {
     return NextResponse.next();
   }
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { SESSION_COOKIE, verifySessionToken } from './session';
+import { SESSION_COOKIE, hasValidSession } from './session';
 
 /**
  * The only thing in web/ that knows the API secret.
@@ -28,7 +28,7 @@ const API_SECRET = process.env.API_SECRET;
  */
 async function requireSession(): Promise<void> {
   const store = await cookies();
-  if (!verifySessionToken(store.get(SESSION_COOKIE)?.value)) redirect('/login');
+  if (!hasValidSession(store.get(SESSION_COOKIE)?.value)) redirect('/login');
 }
 
 /**

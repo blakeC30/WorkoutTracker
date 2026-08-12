@@ -24,6 +24,50 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 export const SESSION_COOKIE = 'wt_session';
 
 /**
+ * Whether the login is switched off for local development.
+ *
+ * An auth bypass is the single most dangerous flag a codebase can carry, because the failure
+ * is silent: nothing breaks, nothing looks wrong, the site is just open. So it takes TWO
+ * independent things to be true, and only one of them is a variable anyone can set.
+ *
+ *   1. NODE_ENV is not 'production'. Next hardcodes production into `next build` output, and
+ *      Vercel builds and runs everything that way, so this is not a label someone maintains
+ *      — it is a property of how the code was compiled.
+ *   2. AUTH_DISABLED is explicitly 'true' or '1'. Absent, empty, or anything else means the
+ *      login stays on.
+ *
+ * Condition 1 is the one that matters. Setting AUTH_DISABLED in Vercel by accident — pasting
+ * a whole .env.local into the dashboard, say — does nothing at all, and says so in the logs
+ * rather than quietly unlocking the site. Note that a local `npm run start` is a production
+ * build too, so it keeps asking for a password. That is correct: the point of running the
+ * production build locally is to see what production does.
+ */
+export function authDisabled(): boolean {
+  const requested = process.env.AUTH_DISABLED === 'true' || process.env.AUTH_DISABLED === '1';
+
+  if (process.env.NODE_ENV === 'production') {
+    if (requested) {
+      console.error(
+        '[auth] AUTH_DISABLED is set on a production build and is being IGNORED. ' +
+          'The login is still required. Remove it from the deployment environment.',
+      );
+    }
+    return false;
+  }
+
+  return requested;
+}
+
+/**
+ * The one question both the proxy and the data layer ask. Having a single answer is the
+ * point: a bypass that has to be remembered in two places is a bypass that will one day be
+ * removed from one of them.
+ */
+export function hasValidSession(token: string | undefined): boolean {
+  return authDisabled() || verifySessionToken(token);
+}
+
+/**
  * 400 days. Chrome clamps cookie lifetime to 400 days and other browsers have followed, so
  * this is the practical ceiling rather than an arbitrary choice. In effect: log in once,
  * then not again for over a year unless you sign out or the secret is rotated.
