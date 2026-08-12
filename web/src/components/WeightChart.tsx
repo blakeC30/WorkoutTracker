@@ -23,15 +23,27 @@ type Point = { date: string; weight: number | null; avg: number; days: number };
 /**
  * Minimum span of the y-axis, in pounds.
  *
- * Without this the line scales to its own min and max, so ANY spread fills the full height —
- * and bodyweight's honest spread over a few days is a pound or two. A 1.4lb wobble drawn as a
- * cliff from the top of the panel to the bottom is not a small error of emphasis; it is the
- * chart reporting a dramatic cut that did not happen.
+ * Without a minimum the line scales to its own min and max, so ANY spread fills the full
+ * height and a 1.4lb wobble is drawn as a cliff — the chart reporting a dramatic cut that did
+ * not happen. With too generous a minimum the opposite: a real couple of pounds flattened into
+ * a line that looks like nothing moved.
  *
- * Six pounds is roughly the largest change that should still read as noise on this screen.
- * Anything more genuinely is a trend and gets to use the height it earns.
+ * Three pounds is about a day's honest noise from water and food. At that span the 1.4lb this
+ * chart currently holds occupies a bit under half the panel — plainly readable as a fall,
+ * plainly not a collapse. Six was the first attempt and buried it at a quarter.
  */
-const MIN_SPAN_LB = 6;
+const MIN_SPAN_LB = 3;
+
+/**
+ * Headroom once the series is genuinely wider than the minimum.
+ *
+ * `Sparkline` maps the lowest point to the very bottom edge and the highest to the very top,
+ * so on a wide series the extremes sit exactly on the boundary and the end marker — a round
+ * cap with real radius — hangs half outside the plot. Asking for 25% more span than the data
+ * needs keeps the line off both edges without changing what it says: everything is still
+ * centred on the same midpoint, drawn to the same proportions, just inset.
+ */
+const HEADROOM = 1.25;
 
 export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
   // Rows without a rolling average cannot be plotted, and dropping them separately from the
@@ -97,6 +109,18 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
 
   const scrubbing = active !== null;
 
+  /*
+   * One expression covers both ends of the range problem, because `Sparkline` takes the larger
+   * of the data's own spread and the floor it is given.
+   *
+   * Narrow series — the floor wins, and a pound and a half is drawn as a pound and a half
+   * rather than as the full height of the panel. Wide series — the padded spread wins, so the
+   * chart scales with the data exactly as before and merely stops short of the edges.
+   */
+  const line = series.map((p) => p.avg);
+  const spread = Math.max(...line) - Math.min(...line);
+  const span = Math.max(MIN_SPAN_LB, spread * HEADROOM);
+
   return (
     <Section
       label="Bodyweight"
@@ -135,7 +159,7 @@ export function WeightChart({ rows }: { rows: BodyweightRow[] }) {
         onPointerUp={() => setActive(null)}
         onPointerCancel={() => setActive(null)}
       >
-        <Sparkline points={series.map((p) => p.avg)} height={54} activeIndex={active} floor={MIN_SPAN_LB} />
+        <Sparkline points={line} height={54} activeIndex={active} floor={span} />
       </div>
 
       <div className="cap" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
