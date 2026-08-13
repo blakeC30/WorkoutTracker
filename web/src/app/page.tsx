@@ -387,10 +387,6 @@ function RegionRow({
     (a, b) => b.primary_sessions - a.primary_sessions || b.sessions - a.sessions,
   );
 
-  // Never trained at all, in the whole history — not merely quiet for four weeks. Worth
-  // distinguishing: one is a lapse and the other is a movement you have never programmed.
-  const untouched = region.rows.every((row) => row.days_since_ever === null);
-
   const states = [
     { label: 'Trained', tone: 'var(--ink)', rows: marks.filter((r) => r.primary_sessions > 0) },
     {
@@ -430,15 +426,18 @@ function RegionRow({
           ))}
         </span>
 
-        <span
-          className="mono"
-          style={{
-            fontSize: 'var(--t-cap)',
-            textAlign: 'right',
-            color: reached > 0 ? 'var(--ink)' : 'var(--flag)',
-          }}
-        >
-          {untouched ? 'never' : `${reached}/${region.rows.length}`}
+        {/* Always a fraction, never a word. "never" was a third thing to learn in a column that
+            otherwise reads n-of-m, and it made the one row you most need to compare against the
+            others the only row you could not — 0/6 sits in the same scale as 2/4, and "never"
+            sits outside it.
+
+            Only the numerator is flagged, and only at zero. It is the count that is wrong; the
+            denominator is just how many muscles the region has and is the same whether you
+            trained them or not. Amber is the app's established needs-attention colour, the same
+            one on an overdue pattern column and a food with guessed macros. */}
+        <span className="mono" style={{ fontSize: 'var(--t-cap)', textAlign: 'right' }}>
+          <span style={{ color: reached === 0 ? 'var(--flag)' : 'var(--ink)' }}>{reached}</span>
+          <span style={{ color: 'var(--ink-dim)' }}>/{region.rows.length}</span>
         </span>
       </summary>
 

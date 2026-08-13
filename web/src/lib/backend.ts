@@ -121,10 +121,6 @@ export type MuscleCoverageRow = {
   sessions: number;
   /** Of those, the ones where this muscle was what the movement was FOR. */
   primary_sessions: number;
-  last_trained: string | null;
-  days_since: number | null;
-  /** Ignores the window, so "not lately" and "not ever" can be told apart. */
-  days_since_ever: number | null;
 };
 
 export type NutritionRow = {

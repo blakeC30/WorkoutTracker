@@ -391,9 +391,12 @@ export async function getBodyweightTrend(days = 90) {
  * missing. A left join, not an inner one: an inner join answers "what did I train" and this
  * question is the other one.
  *
- * Two recencies. `days_since` is inside the window and drives the section; `days_since_ever`
- * ignores it, so "not in the last four weeks" can be told apart from "never once", which are
- * very different things to read about your own legs.
+ * Counts only, no dates. This used to return `last_trained`, a `days_since` inside the window,
+ * and a `days_since_ever` from a correlated subquery that ignored it — the last of those existed
+ * so a region could read "never" rather than "0/6" when it had not been trained in the whole
+ * history. The section now reads n-of-m for every region with the zero flagged, so none of the
+ * three had a consumer, and one of them was a subquery per muscle computing an answer nobody
+ * asked for. Restoring a never-versus-not-lately distinction means restoring that subquery.
  */
 export async function getMuscleCoverage(days = 28) {
   const sql = getSql();
@@ -401,20 +404,7 @@ export async function getMuscleCoverage(days = 28) {
     select m.name                                as muscle,
            m.region                              as region,
            count(distinct w.id)::int             as sessions,
-           count(distinct w.id) filter (where em.role = 'primary')::int as primary_sessions,
-           max(w.entry_date)::text               as last_trained,
-           case when max(w.entry_date) is null then null
-                else ((now() at time zone ${APP_TIMEZONE})::date - max(w.entry_date))::int
-           end                                   as days_since,
-           (
-             select case when max(w2.entry_date) is null then null
-                         else ((now() at time zone ${APP_TIMEZONE})::date - max(w2.entry_date))::int
-                    end
-             from workouts w2
-             join exercise_muscles em2 on em2.exercise_id = w2.exercise_id
-             where em2.muscle_id = m.id
-               and exists (select 1 from workout_sets s2 where s2.workout_id = w2.id)
-           )                                     as days_since_ever
+           count(distinct w.id) filter (where em.role = 'primary')::int as primary_sessions
     from muscles m
     left join exercise_muscles em on em.muscle_id = m.id
     left join workouts w

@@ -213,9 +213,10 @@ rather than a duplicate.
 only thing on the screen that says what to *do*. Below it, **Coverage** takes the same question
 one level finer: every muscle in the catalog, grouped by region, with a mark each — filled where
 a movement was *for* that muscle, hollow where it only assisted, and a hairline track where it
-was not touched at all. A region nothing has ever reached reads `never` rather than `0/6`, since
-a lapse and a movement you have never programmed are different problems. Tapping a region opens
-it onto its own muscles, named and sorted into those same three states.
+was not touched at all. Every region reads n-of-m, and only the numerator is flagged, only at
+zero — `0/6` sits in the same scale as `2/4` and can be compared with it, where a word could
+not. Tapping a region opens it onto its own muscles, named and sorted into those same three
+states.
 
 One region is deliberately absent. `full body` holds only `cardiovascular`, which is not a muscle
 anyone neglects — it is primary on every run and secondary on nothing, so its row was a permanent
