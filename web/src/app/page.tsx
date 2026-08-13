@@ -4,7 +4,7 @@ import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch } from '@/compone
 import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
-import { groupByRegion } from '@/lib/muscles';
+import { forCoverage, groupByRegion } from '@/lib/muscles';
 import { MACROS, macroCalories } from '@/lib/macros';
 import { agoLabel, dayLabel, int, isoWeek, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
@@ -320,7 +320,11 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
       </Section>
     );
   }
-  if (result.rows.length === 0) {
+  // Filtered before anything counts them, so the header total and the rows can never disagree
+  // about what is in scope. Cardiovascular is the one this removes — see REGIONS_OUTSIDE_COVERAGE.
+  const rows = forCoverage(result.rows);
+
+  if (rows.length === 0) {
     return (
       <Section label="Coverage" aside={`${COVERAGE_DAYS}d`}>
         <Empty>No muscles catalogued yet. They arrive with your first exercise.</Empty>
@@ -328,8 +332,8 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
     );
   }
 
-  const regions = groupByRegion(result.rows);
-  const worked = result.rows.filter((row) => row.sessions > 0);
+  const regions = groupByRegion(rows);
+  const worked = rows.filter((row) => row.sessions > 0);
 
   // Regions carrying real work where nothing was ever the target. The reading this section was
   // built for, so it is stated in words rather than left to be inferred from dimmer marks.
@@ -340,7 +344,7 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
   );
 
   return (
-    <Section label="Coverage" aside={`${worked.length}/${result.rows.length} muscles · ${COVERAGE_DAYS}d`}>
+    <Section label="Coverage" aside={`${worked.length}/${rows.length} muscles · ${COVERAGE_DAYS}d`}>
       {/* No gap between rows now that each carries its own 40px tap height. Adding one on top
           of that would space them like paragraphs rather than like a list. */}
       <div>

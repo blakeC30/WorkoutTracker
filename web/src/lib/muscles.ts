@@ -28,6 +28,28 @@ export const REGIONS = [
   { key: 'full body', label: 'Full body' },
 ] as const;
 
+/**
+ * Regions the Coverage section does not ask about.
+ *
+ * `full body` holds exactly one entry, `cardiovascular`, and it is not a muscle anyone neglects.
+ * The question Coverage asks — what is going untrained, and what is only ever assisting — does
+ * not apply to it: it is primary on every run and walk and secondary on nothing, so its row was
+ * a permanent `1/1` that moved only when cardio stopped entirely. Whether cardio is happening is
+ * already answered one section above, by the pattern strip, in days rather than in muscles.
+ *
+ * Kept in REGIONS rather than deleted from it, because REGIONS mirrors the `muscles` table and
+ * is where display order is decided. This is a separate statement — that one region is not part
+ * of THIS question — and keeping the two apart means an exclusion cannot be mistaken for the
+ * taxonomy having a hole in it.
+ */
+export const REGIONS_OUTSIDE_COVERAGE: readonly string[] = ['full body'];
+
+/** Drop the regions Coverage does not ask about. Applied before counting, so the header total
+    and the rows below it can never disagree about how many muscles are in scope. */
+export function forCoverage<T extends { region: string }>(rows: T[]): T[] {
+  return rows.filter((row) => !REGIONS_OUTSIDE_COVERAGE.includes(row.region));
+}
+
 const ORDER = new Map(REGIONS.map((r, i) => [r.key as string, i]));
 
 /** Title Case for a region the list above does not know about, so it can still be shown. */

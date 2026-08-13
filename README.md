@@ -214,7 +214,16 @@ only thing on the screen that says what to *do*. Below it, **Coverage** takes th
 one level finer: every muscle in the catalog, grouped by region, with a mark each — filled where
 a movement was *for* that muscle, hollow where it only assisted, and a hairline track where it
 was not touched at all. A region nothing has ever reached reads `never` rather than `0/6`, since
-a lapse and a movement you have never programmed are different problems.
+a lapse and a movement you have never programmed are different problems. Tapping a region opens
+it onto its own muscles, named and sorted into those same three states.
+
+One region is deliberately absent. `full body` holds only `cardiovascular`, which is not a muscle
+anyone neglects — it is primary on every run and secondary on nothing, so its row was a permanent
+`1/1` that could move only if cardio stopped altogether, and whether cardio is happening is
+already answered one section above in days. `REGIONS_OUTSIDE_COVERAGE` in
+[`web/src/lib/muscles.ts`](web/src/lib/muscles.ts) states that as an exclusion rather than
+deleting the region from the taxonomy, so the list of regions still mirrors the `muscles` table
+and an omission cannot be mistaken for a hole in it.
 
 The primary/secondary split is the reading it exists for. Presses and rows drive the triceps,
 biceps and front delts hard without a single movement ever being *for* them, so those regions
