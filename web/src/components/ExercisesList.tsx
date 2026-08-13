@@ -7,7 +7,7 @@ import { Section, Rule, Sparkline, Empty } from '@/components/ui';
 import { ListControls, matches, type FilterOption, type SortOption } from '@/components/ListControls';
 import { patternColor, patternLabel } from '@/lib/patterns';
 import { n } from '@/lib/num';
-import { agoLabel, clock, daysAgo, dec, int, parseDay, shortDay } from '@/lib/format';
+import { agoLabel, clock, daysAgo, dec, duration as duration_, int, parseDay, shortDay } from '@/lib/format';
 
 /**
  * The exercise catalog, searchable.
@@ -203,8 +203,8 @@ function Endurance({ row }: { row: PrRow }) {
 
 function EnduranceBody({ row }: { row: PrRow }) {
   const distance = n(row.best_distance_mi);
-  const duration = n(row.best_duration_min);
-  const pace = n(row.best_pace_min_per_mi);
+  const duration = n(row.best_duration_sec);
+  const pace = n(row.best_pace_sec_per_mi);
   const stale = daysAgo(row.last_performed) > 28;
 
   return (
@@ -226,9 +226,15 @@ function EnduranceBody({ row }: { row: PrRow }) {
               <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 4 }}>MI</span>
             </>
           ) : (
+            /* Seconds now, so the headline prints mm:ss for anything past two minutes and a
+               bare second count below it. "2400 MIN" would be the old unit's number under the
+               new unit's data, which is the one way this migration could read as plausible and
+               be wrong by a factor of sixty. */
             <>
-              {dec(duration, 0)}
-              <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 4 }}>MIN</span>
+              {duration === null ? '—' : duration < 120 ? Math.round(duration) : clock(duration)}
+              <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 4 }}>
+                {duration !== null && duration < 120 ? 'SEC' : 'MIN:SEC'}
+              </span>
             </>
           )}
         </span>
@@ -252,7 +258,7 @@ function EnduranceBody({ row }: { row: PrRow }) {
       >
         <span style={{ whiteSpace: 'nowrap' }}>
           {pace !== null ? <span style={{ color: 'var(--ink-dim)' }}>best {clock(pace)}/mi</span> : null}
-          {distance !== null && duration !== null ? ` · ${dec(duration, 0)} min` : ''}
+          {distance !== null && duration !== null ? ` · ${duration_(duration)}` : ''}
         </span>
         <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
           {row.total_sets} sessions · {agoLabel(row.last_performed).toLowerCase()}
@@ -287,10 +293,13 @@ function CalisthenicBody({ row }: { row: PrRow }) {
   // Reps when the movement has them, hold time when it does not. A plank has no reps at all,
   // and printing "— REPS" over it was the whole reason it used to sit under Cardio.
   const reps = row.best_reps;
-  const hold = n(row.best_duration_min);
+  const hold = n(row.best_duration_sec);
   const isReps = reps !== null;
-  const value = isReps ? String(reps) : dec(hold, hold !== null && hold < 10 ? 1 : 0);
-  const unit = isReps ? 'REPS' : 'MIN';
+  // A hold is seconds now, so it prints as seconds — "45" over "SEC" rather than "0.8" over
+  // "MIN", which was the old column's way of saying three quarters of a minute. Past two
+  // minutes it switches to mm:ss and drops the unit, since "2:30" needs no label.
+  const value = isReps ? String(reps) : hold === null ? '—' : hold < 120 ? String(Math.round(hold)) : clock(hold);
+  const unit = isReps ? 'REPS' : hold !== null && hold < 120 ? 'SEC' : 'MIN:SEC';
 
 
   return (

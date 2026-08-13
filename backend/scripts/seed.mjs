@@ -279,7 +279,7 @@ async function main() {
           if (acc === 'plank') {
             plannedWorkouts.push({
               exercise: acc,
-              sets: Array.from({ length: 3 }, () => ({ duration_min: 1 })),
+              sets: Array.from({ length: 3 }, () => ({ duration_sec: 60 })),
             });
             parts.push('planks 3x1min');
           } else {
@@ -303,7 +303,7 @@ async function main() {
           exercise: sport,
           // Duration only, no distance — you do not measure a pickup game in miles, and the
           // dashboard has to cope with a session that carries just one of the two.
-          sets: [{ duration_min: minutes, rpe: between(6, 9) }],
+          sets: [{ duration_sec: minutes * 60, rpe: between(6, 9) }],
         });
         parts.push(`${sport} ${minutes} min`);
       }
@@ -318,7 +318,7 @@ async function main() {
             : Math.round(between(1.5, 3) * 10) / 10;
         plannedWorkouts.push({
           exercise: machine,
-          sets: [{ duration_min: minutes, distance_mi: miles, rpe: between(5, 7.5) }],
+          sets: [{ duration_sec: minutes * 60, distance_mi: miles, rpe: between(5, 7.5) }],
         });
         parts.push(`${machine} ${miles} miles in ${minutes} min`);
       }
@@ -391,10 +391,10 @@ async function main() {
           n += 1;
           await client.query(
             `insert into workout_sets (workout_id, set_number, reps, weight_lbs,
-                                       duration_min, distance_mi, rpe, is_seed)
+                                       duration_sec, distance_mi, rpe, is_seed)
              values ($1, $2, $3, $4, $5, $6, $7, true)`,
             [
-              workoutId, n, s.reps ?? null, s.weight_lbs ?? null, s.duration_min ?? null,
+              workoutId, n, s.reps ?? null, s.weight_lbs ?? null, s.duration_sec ?? null,
               s.distance_mi ?? null, s.rpe ? Math.round(s.rpe * 10) / 10 : null,
             ],
           );

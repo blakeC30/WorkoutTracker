@@ -197,10 +197,10 @@ export async function logEntry(
           n += 1;
           await client.query(
             `insert into workout_sets
-               (workout_id, set_number, reps, weight_lbs, duration_min, distance_mi, rpe, notes)
+               (workout_id, set_number, reps, weight_lbs, duration_sec, distance_mi, rpe, notes)
              values ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
-              workoutId, n, s.reps ?? null, s.weight_lbs ?? null, s.duration_min ?? null,
+              workoutId, n, s.reps ?? null, s.weight_lbs ?? null, s.duration_sec ?? null,
               s.distance_mi ?? null, s.rpe ?? null, s.notes ?? null,
             ],
           );
@@ -330,11 +330,11 @@ export async function getRecentHistory(days: number) {
                sum(s.reps) as total_reps,
                sum(s.weight_lbs * s.reps) as volume_lbs,
                sum(s.distance_mi) as distance_mi,
-               sum(s.duration_min) as duration_min,
+               sum(s.duration_sec)::int as duration_sec,
                max(s.rpe) as top_rpe,
                coalesce(json_agg(json_build_object(
                  'set', s.set_number, 'reps', s.reps, 'weight_lbs', s.weight_lbs,
-                 'distance_mi', s.distance_mi, 'duration_min', s.duration_min, 'rpe', s.rpe
+                 'distance_mi', s.distance_mi, 'duration_sec', s.duration_sec, 'rpe', s.rpe
                ) order by s.set_number) filter (where s.id is not null), '[]') as sets
         from workouts w
         join exercises e on e.id = w.exercise_id

@@ -36,7 +36,16 @@ export const entryDate = z
 export const setInput = z.object({
   reps: z.number().int().positive().optional(),
   weight_lbs: z.number().nonnegative().optional().describe('Omit for bodyweight work.'),
-  duration_min: z.number().nonnegative().optional(),
+  duration_sec: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      'How long this set took, in WHOLE SECONDS — never minutes. A 45 second plank is 45. A ' +
+        '40 minute run is 2400. Record what was said and let the server do nothing: do not ' +
+        'convert to minutes and do not round to a tidy number.',
+    ),
   distance_mi: z.number().nonnegative().optional().describe('Miles. Always record for cardio.'),
   rpe: z.number().min(1).max(10).optional().describe('Effort for THIS set, 1-10.'),
   notes: z.string().optional(),
@@ -121,7 +130,7 @@ export const workoutInput = z.object({
     .describe(
       'One entry PER SET, in the order performed. "3x5 at 225" is three identical entries; ' +
         '"225x5, 245x3, 265x1" is three different ones. Cardio is a single entry with ' +
-        'distance_mi and/or duration_min. See set_mode for what happens to sets already ' +
+        'distance_mi and/or duration_sec. See set_mode for what happens to sets already ' +
         'logged for this exercise on this date.',
     ),
   set_mode: z

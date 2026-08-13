@@ -42,7 +42,7 @@ export async function getCalendar(from: string, to: string) {
              count(s.id)::int               as sets,
              round(sum(s.reps * s.weight_lbs)) as volume_lbs,
              round(sum(s.distance_mi), 2)   as cardio_mi,
-             round(sum(s.duration_min))     as cardio_min,
+             sum(s.duration_sec)::int       as cardio_sec,
              array_agg(distinct coalesce(e.pattern, 'other')) as patterns
       from workouts w
       join exercises e on e.id = w.exercise_id
@@ -72,7 +72,7 @@ export async function getCalendar(from: string, to: string) {
     select to_char(days.date, 'YYYY-MM-DD') as date,
            coalesce(t.exercises, 0) as exercises,
            coalesce(t.sets, 0)      as sets,
-           t.volume_lbs, t.cardio_mi, t.cardio_min,
+           t.volume_lbs, t.cardio_mi, t.cardio_sec,
            coalesce(t.patterns, '{}') as patterns,
            coalesce(f.items, 0)     as items,
            f.calories, f.protein_g,
@@ -211,7 +211,7 @@ export async function getDay(date: string) {
                            'set_number',   s.set_number,
                            'reps',         s.reps,
                            'weight_lbs',   s.weight_lbs,
-                           'duration_min', s.duration_min,
+                           'duration_sec', s.duration_sec,
                            'distance_mi',  s.distance_mi,
                            'rpe',          s.rpe,
                            'notes',        s.notes)

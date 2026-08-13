@@ -407,7 +407,7 @@ export const mcpHandler = createMcpHandler(
     // around fields it cannot see. This string is the only way to tell from a running
     // conversation which vintage the client is actually holding: ask it what the server version
     // is, and if it disagrees with what is deployed, the connector needs removing and re-adding.
-    serverInfo: { name: 'workout-tracker', version: '0.9.0' },
+    serverInfo: { name: 'workout-tracker', version: '0.10.0' },
 
     /*
      * These instructions are sent on every connection, and they are the layer that has to
@@ -482,7 +482,8 @@ export const mcpHandler = createMcpHandler(
       'SETS: give ONE entry per set actually performed. "3x5 at 225" is three identical ' +
       'entries; "225x5, 245x3, 265x1" is three different ones — flattening a ramp to one ' +
       'number destroys both the PR and the volume. Cardio is a single entry carrying ' +
-      'distance_mi and/or duration_min; always record distance when one is mentioned.\n\n' +
+      'distance_mi and/or duration_sec, and duration is WHOLE SECONDS — a 40 minute run is ' +
+      '2400, never 40. Always record distance when one is mentioned.\n\n' +
 
       'RE-LOGGING an exercise that already has sets on that date is governed by set_mode, and ' +
       'it is the one field here that can destroy data. The default, "replace", throws away ' +

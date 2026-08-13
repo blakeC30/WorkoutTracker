@@ -4,7 +4,7 @@ import { getDay, n, n0, type DayDetail, type DayJournal, type DayMeal, type DayW
 import { Masthead, Section, Rule, Figure, Empty, Fault, Macros, MacroBar } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
-import { addDays, agoLabel, clock, dayLabel, dec, int, monthKey, monthShape, shortDay, today } from '@/lib/format';
+import { addDays, agoLabel, clock, dayLabel, dec, duration as duration_, int, monthKey, monthShape, shortDay, today } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -190,7 +190,7 @@ function Training({ workouts }: { workouts: DayWorkout[] }) {
 function Exercise({ workout }: { workout: DayWorkout }) {
   const volume = workout.sets.reduce((sum, set) => sum + (set.reps ?? 0) * n0(set.weight_lbs), 0);
   const distance = workout.sets.reduce((sum, set) => sum + n0(set.distance_mi), 0);
-  const duration = workout.sets.reduce((sum, set) => sum + n0(set.duration_min), 0);
+  const duration = workout.sets.reduce((sum, set) => sum + n0(set.duration_sec), 0);
 
   // Cardio and timed holds have no volume; falling back to the category would label a plank
   // "strength", which is true and useless. Report what was actually measured.
@@ -200,7 +200,7 @@ function Exercise({ workout }: { workout: DayWorkout }) {
       : distance > 0
         ? `${dec(distance, 2)} mi`
         : duration > 0
-          ? `${dec(duration, 0)} min`
+          ? duration_(duration)
           : (workout.category ?? '');
 
   return (
@@ -236,7 +236,7 @@ function Exercise({ workout }: { workout: DayWorkout }) {
 function SetLine({ set }: { set: DayWorkout['sets'][number] }) {
   const weight = n(set.weight_lbs);
   const distance = n(set.distance_mi);
-  const duration = n(set.duration_min);
+  const duration = n(set.duration_sec);
   const rpe = n(set.rpe);
 
   return (
@@ -258,13 +258,13 @@ function SetLine({ set }: { set: DayWorkout['sets'][number] }) {
           : distance !== null
             ? `${dec(distance, 2)} mi`
             : duration !== null
-              ? `${dec(duration, 0)} min`
+              ? duration_(duration)
               : `× ${set.reps ?? '—'}`}
       </span>
 
       {distance !== null && weight === null && duration !== null ? (
         <span style={{ color: 'var(--ink-dim)' }}>
-          {dec(duration, 0)} min · {clock(duration / distance)}/mi
+          {duration_(duration)} · {clock(duration / distance)}/mi
         </span>
       ) : null}
 

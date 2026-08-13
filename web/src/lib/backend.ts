@@ -163,8 +163,8 @@ export type PrRow = {
   best_e1rm_reps: number | null;
   best_e1rm_on: string | null;
   best_distance_mi: Num;
-  best_duration_min: Num;
-  best_pace_min_per_mi: Num;
+  best_duration_sec: Num;
+  best_pace_sec_per_mi: Num;
   total_sets: number;
   last_performed: string;
   /**
@@ -199,7 +199,7 @@ export type CalendarRow = {
   sets: number;
   volume_lbs: Num;
   cardio_mi: Num;
-  cardio_min: Num;
+  cardio_sec: Num;
   /** Movement patterns trained that day — what the squares and the matrix are drawn from. */
   patterns: string[];
   items: number;
@@ -244,7 +244,7 @@ export type PatternVolumeRow = {
   sessions: number;
   days: number;
   distance_mi: Num;
-  duration_min: Num;
+  duration_sec: Num;
 };
 
 export const getVolumeByPattern = (days = 28) =>
@@ -258,7 +258,7 @@ export type ExerciseSession = {
   top_weight: Num;
   e1rm: Num;
   distance_mi: Num;
-  duration_min: Num;
+  duration_sec: Num;
   avg_rpe: Num;
   set_detail: DaySet[];
 };
@@ -323,7 +323,7 @@ export type DaySet = {
   set_number: number;
   reps: number | null;
   weight_lbs: Num;
-  duration_min: Num;
+  duration_sec: Num;
   distance_mi: Num;
   rpe: Num;
   notes: string | null;

@@ -473,6 +473,14 @@ with it, retroactively and everywhere. That is why both catalogs are searched be
 is created, and why `foods` and `exercises` each have a unique index on `lower(name)`
 (migration 007): two spellings of one thing silently halve its history.
 
+- **Set duration is whole SECONDS**, in `workout_sets.duration_sec`. A 45 second plank is
+  `45`; a 40 minute run is `2400`. It was fractional minutes until migration 010, and the reason
+  it changed is not precision but who does the arithmetic: "held a 40 second plank" had to
+  become `0.67` before it could be stored, which is a division the model performs and a lossy
+  one — 0.67 minutes is 40.2 seconds. `numeric(6,2)` minutes cannot represent thirds at all, so
+  20s and 40s were always approximations while 15, 30, 45 and 90 were exact. Every rule in the
+  server instructions exists to stop the model deriving things on the way in; this was the field
+  that broke it.
 - A journal's `created_at` is **not** the data's `entry_date`. "Yesterday I squatted" is a
   journal row stamped today and a workout row dated yesterday. Never derive one from the other.
 - `journal_id` is nullable — rows created or corrected by hand in the dashboard have no

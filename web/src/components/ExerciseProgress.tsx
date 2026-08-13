@@ -47,7 +47,7 @@ function seriesFor(sessions: ExerciseSession[]): Series | null {
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
   const loaded = sessions.filter((s) => n(s.e1rm) !== null);
-  const endurance = sessions.filter((s) => n(s.distance_mi) !== null || n(s.duration_min) !== null);
+  const endurance = sessions.filter((s) => n(s.distance_mi) !== null || n(s.duration_sec) !== null);
 
   // Bodyweight work: reps at no load. Such a session has no e1RM, no distance and no duration,
   // so without this branch both others come up empty and a push-up's page renders as a shell.
@@ -84,18 +84,20 @@ function seriesFor(sessions: ExerciseSession[]): Series | null {
 
   if (loaded.length === 0) {
     // Cardio and timed work have no estimated max; distance is the series that means something.
-    const points = endurance.map((s) => n0(s.distance_mi) || n0(s.duration_min));
+    const points = endurance.map((s) => n0(s.distance_mi) || n0(s.duration_sec));
     const latest = endurance[endurance.length - 1];
-    // Distance when it is recorded, minutes otherwise — and the heading names whichever it is.
+    // Distance when it is recorded, duration otherwise — and the heading names whichever it is.
     const isDistance = n(latest?.distance_mi) !== null;
     return {
       label: isDistance ? 'Distance' : 'Duration',
       aside: plural(sessions.length, 'session'),
       points,
       dates: endurance.map((s) => s.date),
-      unit: isDistance ? 'MI' : 'MIN',
-      format: (v) => dec(v, 2),
-      decimals: 2,
+      unit: isDistance ? 'MI' : 'SEC',
+      // Seconds are whole; miles are not. Formatting a 2400 second run as "2400.00" would be
+      // precision the unit does not have.
+      format: (v) => (isDistance ? dec(v, 2) : String(Math.round(v))),
+      decimals: isDistance ? 2 : 0,
       height: 54,
       delta: null,
       footerLeft: <>Best {dec(Math.max(...points, 0), 2)}</>,

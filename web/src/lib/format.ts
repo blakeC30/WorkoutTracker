@@ -60,12 +60,29 @@ export function compact(value: number | null): string {
   return `${(value / 1000).toFixed(Math.abs(value) < 10_000 ? 1 : 0)}k`;
 }
 
-/** Minutes as '8:42' — a pace or a duration reads wrong as '8.7'. */
-export function clock(minutes: number | null): string {
-  if (minutes === null) return '—';
-  const whole = Math.floor(minutes);
-  const seconds = Math.round((minutes - whole) * 60);
-  return `${whole}:${String(seconds).padStart(2, '0')}`;
+/**
+ * Seconds as '8:42' — a pace or a duration reads wrong as '8.7'.
+ *
+ * Takes SECONDS now, not minutes, along with everything else that carries a duration. It used
+ * to do the minutes-to-mm:ss arithmetic itself; the database stores whole seconds, so the
+ * conversion is a divide and a remainder rather than a fractional part.
+ */
+export function clock(seconds: number | null): string {
+  if (seconds === null) return '—';
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+/**
+ * A duration in the unit a person would say it in.
+ *
+ * Under two minutes reads as seconds, because that is a hold — "45s", not "0:45". At or above
+ * it reads mm:ss, because that is a run, and "2400s" is a number nobody converts in their head.
+ * One helper so the threshold cannot differ between the two screens that show durations.
+ */
+export function duration(seconds: number | null): string {
+  if (seconds === null) return '—';
+  return seconds < 120 ? `${Math.round(seconds)}s` : clock(seconds);
 }
 
 /** How many days ago, in the app's timezone. Used to grey out stale rows. */

@@ -5,7 +5,7 @@ import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { ExerciseProgress } from '@/components/ExerciseProgress';
 import { patternColor, patternLabel } from '@/lib/patterns';
-import { agoLabel, clock, dec, int, shortDay } from '@/lib/format';
+import { agoLabel, clock, dec, duration as duration_, int, shortDay } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,7 +152,7 @@ function SessionRow({
   const volume = n0(session.volume_lbs);
   const e1rm = n(session.e1rm);
   const distance = n(session.distance_mi);
-  const duration = n(session.duration_min);
+  const duration = n(session.duration_sec);
 
   return (
     <Link href={`/calendar/${session.date}`} className="pressable" style={{ display: 'block' }}>
@@ -170,7 +170,7 @@ function SessionRow({
               : distance !== null
                 ? `${dec(distance, 2)} mi`
                 : duration !== null
-                  ? `${dec(duration, 0)} min`
+                  ? duration_(duration)
                   : `${int(session.total_reps)} reps`}
           </span>
         </div>
@@ -203,8 +203,8 @@ function SessionRow({
                 ? `${dec(n(set.weight_lbs), 0)}×${set.reps}`
                 : n(set.distance_mi) !== null
                   ? `${dec(n(set.distance_mi), 2)}mi`
-                  : n(set.duration_min) !== null
-                    ? `${dec(n(set.duration_min), 0)}min`
+                  : n(set.duration_sec) !== null
+                    ? duration_(n(set.duration_sec))
                     : `×${set.reps ?? '—'}`}
             </span>
           ))}

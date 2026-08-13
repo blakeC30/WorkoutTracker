@@ -15,4 +15,5 @@ export const EXPECTED_MIGRATIONS: readonly string[] = [
   '007_case_insensitive_names.sql',
   '008_capitalise_catalog_names.sql',
   '009_title_case_catalog_names.sql',
+  '010_duration_seconds.sql',
 ];

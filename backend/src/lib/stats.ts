@@ -34,7 +34,7 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
   return sql`
     with matched as (
       select e.id as exercise_id, e.name as exercise, e.category, e.pattern,
-             w.entry_date, s.reps, s.weight_lbs, s.distance_mi, s.duration_min
+             w.entry_date, s.reps, s.weight_lbs, s.distance_mi, s.duration_sec
       from workout_sets s
       join workouts w  on w.id = s.workout_id
       join exercises e on e.id = w.exercise_id
@@ -89,7 +89,7 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
                         then weight_lbs * (1 + reps::numeric / 30) end),
                max(case when coalesce(weight_lbs, 0) = 0 then reps end),
                max(distance_mi),
-               max(duration_min)
+               max(duration_sec)
              ) as value
       from matched
       group by exercise_id, entry_date
@@ -100,11 +100,11 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
     endurance as (
       select exercise_id,
              max(distance_mi)  as best_distance_mi,
-             max(duration_min) as best_duration_min,
-             min(case when distance_mi > 0 and duration_min > 0
-                      then duration_min / distance_mi end) as best_pace_min_per_mi
+             max(duration_sec)::int as best_duration_sec,
+             min(case when distance_mi > 0 and duration_sec > 0
+                      then duration_sec / distance_mi end) as best_pace_sec_per_mi
       from matched
-      where distance_mi is not null or duration_min is not null
+      where distance_mi is not null or duration_sec is not null
       group by exercise_id
     )
     select m.exercise, m.category, m.pattern,
@@ -138,8 +138,8 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
            b.reps              as best_e1rm_reps,
            b.entry_date::text  as best_e1rm_on,
            en.best_distance_mi,
-           en.best_duration_min,
-           round(en.best_pace_min_per_mi, 2) as best_pace_min_per_mi,
+           en.best_duration_sec,
+           round(en.best_pace_sec_per_mi)::int as best_pace_sec_per_mi,
            count(*)::int           as total_sets,
            max(m.entry_date)::text as last_performed,
            -- The last ten sessions, oldest first, so the row can draw its own trend. The inner
@@ -161,7 +161,7 @@ export async function getPrs(opts: { exercise?: string; limit?: number } = {}) {
     group by m.exercise_id, m.exercise, m.category, m.pattern,
              h.exercise_id, h.weight_lbs, h.reps, h.entry_date,
              b.e1rm, b.weight_lbs, b.reps, b.entry_date,
-             en.best_distance_mi, en.best_duration_min, en.best_pace_min_per_mi,
+             en.best_distance_mi, en.best_duration_sec, en.best_pace_sec_per_mi,
              c.exercise_id, c.reps, c.entry_date
     order by max(m.entry_date) desc
     limit ${limit}`;
@@ -205,12 +205,12 @@ export async function getExerciseHistory(name: string, limit = 120) {
            round(max(s.weight_lbs * (1 + s.reps::numeric / 30))
                  filter (where s.reps <= 12))  as e1rm,
            round(sum(s.distance_mi), 2)        as distance_mi,
-           round(sum(s.duration_min))          as duration_min,
+           sum(s.duration_sec)::int            as duration_sec,
            round(avg(s.rpe), 1)                as avg_rpe,
            coalesce((
              select json_agg(json_build_object(
                       'set_number', s2.set_number, 'reps', s2.reps, 'weight_lbs', s2.weight_lbs,
-                      'duration_min', s2.duration_min, 'distance_mi', s2.distance_mi, 'rpe', s2.rpe)
+                      'duration_sec', s2.duration_sec, 'distance_mi', s2.distance_mi, 'rpe', s2.rpe)
                     order by s2.set_number)
              from workout_sets s2 where s2.workout_id = w.id), '[]'::json) as set_detail
     from workouts w
@@ -255,7 +255,7 @@ export async function getVolumeByPattern(days = 28) {
            count(distinct w.id)::int             as sessions,
            count(distinct w.entry_date)::int     as days,
            round(sum(s.distance_mi), 2)          as distance_mi,
-           round(sum(s.duration_min))            as duration_min
+           sum(s.duration_sec)::int              as duration_sec
     from workouts w
     join exercises e on e.id = w.exercise_id
     join workout_sets s on s.workout_id = w.id
@@ -285,7 +285,7 @@ export async function getWeeklySummary(weeks = 8) {
              count(s.id)::int                   as total_sets,
              round(sum(s.reps * s.weight_lbs))  as volume_lbs,
              round(sum(s.distance_mi), 1)       as cardio_miles,
-             round(sum(s.duration_min))         as cardio_minutes,
+             sum(s.duration_sec)::int           as cardio_seconds,
              round(avg(s.rpe), 1)               as avg_rpe
       from workouts w
       join workout_sets s on s.workout_id = w.id
@@ -322,7 +322,7 @@ export async function getWeeklySummary(weeks = 8) {
            coalesce(t.training_days, 0)       as training_days,
            coalesce(t.exercises_performed, 0) as exercises_performed,
            coalesce(t.total_sets, 0)          as total_sets,
-           t.volume_lbs, t.cardio_miles, t.cardio_minutes, t.avg_rpe,
+           t.volume_lbs, t.cardio_miles, t.cardio_seconds, t.avg_rpe,
            n.avg_calories, n.avg_protein_g,
            w.avg_weight_lbs, w.weigh_ins
     from (
