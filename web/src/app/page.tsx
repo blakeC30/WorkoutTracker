@@ -14,6 +14,17 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 /**
+ * The window Coverage asks over.
+ *
+ * One constant because the number was previously written in four places — once as the argument
+ * to the query and three times as the "28d" label — and only the two states nobody sees, the
+ * error and the empty one, actually carried it. The section a person reads every day said
+ * "8/20 muscles" and never mentioned a window at all, so there was no way to tell whether it
+ * meant this week, this month, or ever.
+ */
+const COVERAGE_DAYS = 28;
+
+/**
  * The five-second check-in.
  *
  * Rhythm down the page is deliberate: one big figure, then a chart, then a ledger of bars,
@@ -24,7 +35,7 @@ export default async function Today() {
   // Fetched together rather than in sequence; four round trips to Vercel add up on cellular.
   const [weight, coverage, nutrition, review, recency] = await Promise.all([
     getBodyweight(90),
-    getMuscleCoverage(28),
+    getMuscleCoverage(COVERAGE_DAYS),
     getNutrition(7),
     getReview(25),
     getRecency(),
@@ -304,14 +315,14 @@ function Gap({ row }: { row: RecencyRow }) {
 function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCoverage>> }) {
   if (!result.ok) {
     return (
-      <Section label="Coverage" aside="28d">
+      <Section label="Coverage" aside={`${COVERAGE_DAYS}d`}>
         <Fault error={result.error} />
       </Section>
     );
   }
   if (result.rows.length === 0) {
     return (
-      <Section label="Coverage" aside="28d">
+      <Section label="Coverage" aside={`${COVERAGE_DAYS}d`}>
         <Empty>No muscles catalogued yet. They arrive with your first exercise.</Empty>
       </Section>
     );
@@ -329,7 +340,7 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
   );
 
   return (
-    <Section label="Coverage" aside={`${worked.length}/${result.rows.length} muscles`}>
+    <Section label="Coverage" aside={`${worked.length}/${result.rows.length} muscles · ${COVERAGE_DAYS}d`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {regions.map((region, i) => (
           <RegionRow key={region.key} region={region} index={i} />
