@@ -1,4 +1,4 @@
-import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type FoodRow } from '@/lib/backend';
+import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type FoodRow, type PatternVolumeRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, BarRow, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
@@ -300,33 +300,12 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPatte
   // PATTERN_ROWS, not PATTERNS: the five have calendar slots, but a list can carry the
   // catch-all too. Iterating the five dropped sports entirely — 75 minutes of basketball
   // reported as nothing at all.
-  const trained = PATTERN_ROWS.map((p) => ({ pattern: p, row: byPattern.get(p.key) })).filter(
-    (entry) => entry.row !== undefined,
-  );
-
-  // Only tonnage can be a bar, because only tonnage is comparable between patterns. Everything
-  // else is reported in its own unit underneath.
-  const loaded = trained.filter((entry) => n0(entry.row?.volume_lbs) > 0);
-
-  // Every other measure a pattern actually recorded, named and in its own unit.
-  //
-  // This is deliberately not "the timed ones". Core is not only planks — situps, crunches and
-  // russian twists are unloaded REPS, and a weighted cable crunch is tonnage, so one pattern can
-  // legitimately produce three different measures in a week. Cardio is the same: a run may carry
-  // miles, minutes, or both. Assuming a single unit per pattern printed "Core — min" for a month
-  // of situps and "3.0 mi · — min" for a run logged without a stopwatch.
-  const other = trained
-    .map((entry) => {
-      const parts: string[] = [];
-      const reps = n(entry.row?.bodyweight_reps);
-      const distance = n(entry.row?.distance_mi);
-      const duration = n(entry.row?.duration_min);
-      if (reps !== null && reps > 0) parts.push(`${int(reps)} reps`);
-      if (distance !== null && distance > 0) parts.push(`${dec(distance, 1)} mi`);
-      if (duration !== null && duration > 0) parts.push(`${int(duration)} min`);
-      return { pattern: entry.pattern, parts };
-    })
-    .filter((entry) => entry.parts.length > 0);
+  const trained = PATTERN_ROWS.map((p) => ({ pattern: p, row: byPattern.get(p.key) }))
+    .filter((entry) => entry.row !== undefined)
+    .map((entry) => ({ ...entry, measures: measuresOf(entry.row) }))
+    // A pattern the query returned but which produced no measurable work at all — possible if
+    // sets were logged with no reps, weight, distance or duration on any of them.
+    .filter((entry) => entry.measures.length > 0);
 
   if (trained.length === 0) {
     return (
@@ -336,44 +315,94 @@ function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPatte
     );
   }
 
-  const max = Math.max(...loaded.map((entry) => n0(entry.row?.volume_lbs)), 1);
-  const total = loaded.reduce((sum, entry) => sum + n0(entry.row?.volume_lbs), 0);
+  // The bar is tonnage and only tonnage, because tonnage is the one measure that means the same
+  // thing from one pattern to the next. Patterns with none get a row with no bar, not no row.
+  const tonnage = (entry: (typeof trained)[number]) => n0(entry.row?.volume_lbs);
+  const max = Math.max(...trained.map(tonnage), 1);
+  const total = trained.reduce((sum, entry) => sum + tonnage(entry), 0);
 
   return (
     <Section label="Volume" aside="28d">
-      {loaded.map((entry, i) => (
+      {trained.map((entry, i) => (
         <BarRow
           key={entry.pattern.key}
           index={i}
-          label={entry.pattern.label}
-          value={n0(entry.row?.volume_lbs)}
+          label={
+            <>
+              {/* The swatch, not the bar, is what ties a row to its pattern colour. A row
+                  measured in miles has no bar to be coloured, and losing the colour on exactly
+                  the rows that are not tonnage would make the palette look like it encodes
+                  "loaded" rather than "which pattern". */}
+              <Swatch tone={entry.pattern.color} />
+              {patternLabel(entry.pattern.key)}
+            </>
+          }
+          value={tonnage(entry)}
           max={max}
           tone={entry.pattern.color}
-          display={compact(n0(entry.row?.volume_lbs))}
+          display={<Measures parts={entry.measures} />}
         />
       ))}
 
-      {loaded.length > 0 ? (
+      {total > 0 ? (
         <div className="cap" style={{ marginTop: 10, textAlign: 'right', color: 'var(--ink-faint)' }}>
           {int(total)} lb lifted
         </div>
       ) : null}
-
-      {/* One line per pattern, listing only what was recorded. A pattern with a bar can appear
-          here too — weighted crunches and situps in the same week are both real and neither
-          converts into the other. */}
-      {other.length > 0 ? (
-        <div style={{ marginTop: loaded.length > 0 ? 14 : 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {other.map((entry) => (
-            <div key={entry.pattern.key} className="cap" style={{ color: 'var(--ink-faint)' }}>
-              <Swatch tone={entry.pattern.color} />
-              <span style={{ color: 'var(--ink-dim)' }}>{entry.pattern.label}</span>{' '}
-              {entry.parts.join(' · ')}
-            </div>
-          ))}
-        </div>
-      ) : null}
     </Section>
+  );
+}
+
+/** One measure a pattern actually recorded: a number and the unit it was recorded in. */
+type Measure = { value: string; unit: string };
+
+/**
+ * Everything a pattern accumulated, in the units it accumulated it in.
+ *
+ * Deliberately not "the unit for this pattern". Core is not only planks — situps and crunches
+ * are unloaded REPS while a weighted cable crunch is tonnage, so one pattern can legitimately
+ * produce three measures in four weeks. Cardio is the same: a run may carry miles, minutes, or
+ * both. Assuming one unit per pattern printed "Core — min" for a month of situps and
+ * "3.0 mi · — min" for a run logged without a stopwatch.
+ *
+ * Tonnage leads when there is any, because it is the measure the bar beside it is drawn from.
+ */
+function measuresOf(row: PatternVolumeRow | undefined): Measure[] {
+  const parts: Measure[] = [];
+  const push = (value: number | null, format: (v: number) => string, unit: string) => {
+    if (value !== null && value > 0) parts.push({ value: format(value), unit });
+  };
+  push(n(row?.volume_lbs), (v) => compact(v), 'lb');
+  push(n(row?.bodyweight_reps), (v) => int(v), 'reps');
+  push(n(row?.distance_mi), (v) => dec(v, 1), 'mi');
+  push(n(row?.duration_min), (v) => int(v), 'min');
+  return parts;
+}
+
+/**
+ * A pattern's measures on one line: `2.7k lb · 4 reps`.
+ *
+ * This is the fix for the section's oldest wrong idea. Tonnage used to be drawn as bars and
+ * everything else listed separately underneath, which meant a pattern doing both appeared
+ * TWICE — pull showed up as a 2.7k bar for barbell rows and again below as "4 reps" for
+ * pull-ups, reading as two different patterns that happened to share a name. A pattern is one
+ * thing and gets one row; the units it was measured in belong inside that row, not in a second
+ * list keyed by the same name.
+ *
+ * Units stay dimmed so a scan down the column reads the numbers first, and the separator is the
+ * same interpunct the app uses everywhere else for "and also".
+ */
+function Measures({ parts }: { parts: Measure[] }) {
+  return (
+    <>
+      {parts.map((part, i) => (
+        <span key={part.unit} style={{ whiteSpace: 'nowrap' }}>
+          {i > 0 ? <span style={{ color: 'var(--ink-faint)' }}> · </span> : null}
+          {part.value}
+          <span style={{ color: 'var(--ink-dim)', marginLeft: 3 }}>{part.unit}</span>
+        </span>
+      ))}
+    </>
   );
 }
 

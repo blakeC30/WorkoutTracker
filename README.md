@@ -210,9 +210,23 @@ rather than a duplicate.
 > will keep seeing the white screen and conclude, reasonably but wrongly, that it did not work.
 
 **Today** opens with how long since each movement pattern was last trained, because that is the
-only thing on the screen that says what to *do*. Volume below it is grouped by pattern, and
-patterns with no tonnage — cardio, planks — are reported in minutes and miles rather than
-dropped, since a bar chart silently omitting core reads as "you have not trained it".
+only thing on the screen that says what to *do*. Volume below it is grouped by pattern, **one
+row per pattern and never more**, because a pattern is one thing however many units it was
+measured in.
+
+That last part is the whole difficulty of the section. A single pattern can accumulate work that
+does not convert: pull is barbell rows in pounds *and* pull-ups in reps, core is weighted
+crunches in pounds *and* situps in reps, cardio is miles *and* minutes. Tonnage used to be drawn
+as bars with everything else listed separately underneath, which meant a pattern doing both
+appeared twice — pull as a 2.7k bar and again as "4 reps", reading as two patterns sharing a
+name. Now each row carries every unit that pattern recorded, tonnage first: `PULL │ ████ │ 2.7k
+lb · 4 reps`.
+
+The bar is tonnage and only tonnage, since that is the one measure comparable between patterns.
+A pattern with none gets a row with no bar rather than no row — an empty bar next to "45 reps"
+would say "you did none of this", which is the opposite of what the row reports — and the
+pattern colour rides on a swatch beside the label rather than on the bar, so a row measured in
+miles is still visibly cardio.
 
 **Exercises** is the `exercises` catalog with a record and a trend on each — the counterpart to
 the Food tab, which browses the other catalog. It splits into Loaded, Bodyweight and Cardio by

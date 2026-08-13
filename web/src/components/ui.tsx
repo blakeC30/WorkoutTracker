@@ -170,14 +170,19 @@ export function BarRow({
   tone = 'var(--signal)',
   index = 0,
 }: {
-  label: string;
+  /** Nodes, not strings: a row may need a swatch beside its name, or a dimmed unit after its
+      value. Both are still a single line — this is not licence to nest a layout in here. */
+  label: ReactNode;
   value: number;
   max: number;
-  display: string;
+  display: ReactNode;
   tone?: string;
   /** Position in its list, used only to stagger the draw. */
   index?: number;
 }) {
+  // A zero value draws no bar at all rather than a stub or an empty track. Rows here can be
+  // measured in units the bar does not speak, and a visible-but-empty bar next to "45 reps"
+  // says "you did none of this", which is the opposite of what such a row is reporting.
   const pct = max > 0 ? Math.max(value / max, 0) * 100 : 0;
 
   return (
