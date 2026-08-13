@@ -227,9 +227,16 @@ and an omission cannot be mistaken for a hole in it.
 
 The primary/secondary split is the reading it exists for. Presses and rows drive the triceps,
 biceps and front delts hard without a single movement ever being *for* them, so those regions
-come back **worked, never targeted** — a real gap that a volume total actively hides, because by
-tonnage they look busy. Nothing else in the app can say it: a pattern says a pull happened, and
-only this says the lats got it while the traps and rear delts did not.
+come back **worked but never targeted** — a real gap that a volume total actively hides, because
+by tonnage they look busy. A region in that state shows no filled marks at all, and opening it
+lists muscles under Assisting with no Trained line above them. Nothing else in the app can say
+it: a pattern says a pull happened, and only this says the lats got it while the traps and rear
+delts did not.
+
+Nothing sits below the rows. A key for the marks and a computed line naming the passenger
+regions both lived there and were both removed once the rows answered those questions
+themselves — opening a region names its states in words, and a region with no Trained line *is*
+the passenger reading, stated where you are already looking.
 
 It is built on *performance*, never tonnage. `getVolumeByMuscle` — which the `get_volume_by_muscle`
 MCP tool serves — filters to loaded sets, so sit-ups attribute nothing to abs, pull-ups nothing

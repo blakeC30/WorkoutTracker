@@ -335,34 +335,21 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
   const regions = groupByRegion(rows);
   const worked = rows.filter((row) => row.sessions > 0);
 
-  // Regions carrying real work where nothing was ever the target. The reading this section was
-  // built for, so it is stated in words rather than left to be inferred from dimmer marks.
-  const passengers = regions.filter(
-    (region) =>
-      region.rows.some((row) => row.sessions > 0) &&
-      region.rows.every((row) => row.primary_sessions === 0),
-  );
-
   return (
     <Section label="Coverage" aside={`${worked.length}/${rows.length} muscles · ${COVERAGE_DAYS}d`}>
       {/* No gap between rows now that each carries its own 40px tap height. Adding one on top
-          of that would space them like paragraphs rather than like a list. */}
+          of that would space them like paragraphs rather than like a list.
+
+          Nothing follows the rows. Two lines used to: a key explaining what a filled mark meant,
+          and a computed line naming the regions that were worked but never targeted. Both became
+          answers to questions the rows had started answering themselves — opening a region names
+          its three states in words, which is the key, and a region with no Trained line is the
+          passenger reading stated where you are already looking. Explanatory text under a control
+          that explains itself is the kind of thing that accumulates. */}
       <div>
         {regions.map((region, i) => (
           <RegionRow key={region.key} region={region} index={i} />
         ))}
-      </div>
-
-      {/* Two lines at most, and only when they have something to say. */}
-      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {passengers.length > 0 ? (
-          <div className="cap" style={{ color: 'var(--flag)' }}>
-            {passengers.map((r) => r.label).join(' · ')} — worked, never targeted
-          </div>
-        ) : null}
-        <div className="cap" style={{ color: 'var(--ink-faint)' }}>
-          Filled = trained directly · hollow = assisting only · tap a row for its muscles
-        </div>
       </div>
     </Section>
   );
