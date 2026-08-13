@@ -1,10 +1,9 @@
-import { getBodyweight, getMuscleCoverage, getNutrition, getRecency, getReview, n, n0, type RecencyRow, type FoodRow, type MuscleCoverageRow } from '@/lib/backend';
-import type { CSSProperties } from 'react';
+import { getBodyweight, getMuscleCoverage, getNutrition, getRecency, getReview, n, n0, type RecencyRow, type FoodRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
+import { Coverage } from '@/components/Coverage';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
-import { forCoverage, groupByRegion } from '@/lib/muscles';
 import { MACROS, macroCalories } from '@/lib/macros';
 import { agoLabel, dayLabel, int, isoWeek, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
@@ -12,17 +11,6 @@ import { signOut } from '@/app/login/actions';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
-
-/**
- * The window Coverage asks over.
- *
- * One constant because the number was previously written in four places — once as the argument
- * to the query and three times as the "28d" label — and only the two states nobody sees, the
- * error and the empty one, actually carried it. The section a person reads every day said
- * "8/20 muscles" and never mentioned a window at all, so there was no way to tell whether it
- * meant this week, this month, or ever.
- */
-const COVERAGE_DAYS = 28;
 
 /**
  * The five-second check-in.
@@ -35,7 +23,7 @@ export default async function Now() {
   // Fetched together rather than in sequence; four round trips to Vercel add up on cellular.
   const [weight, coverage, nutrition, review, recency] = await Promise.all([
     getBodyweight(90),
-    getMuscleCoverage(COVERAGE_DAYS),
+    getMuscleCoverage(),
     getNutrition(7),
     getReview(25),
     getRecency(),
@@ -66,7 +54,13 @@ export default async function Now() {
       </Reveal>
       <Rule />
       <Reveal delay={180}>
-        <Coverage result={coverage} />
+        {coverage.ok ? (
+          <Coverage rows={coverage.rows} />
+        ) : (
+          <Section label="Coverage">
+            <Fault error={coverage.error} />
+          </Section>
+        )}
       </Reveal>
 
       {review.ok && review.rows.length > 0 ? (
@@ -298,173 +292,5 @@ function Gap({ row }: { row: RecencyRow }) {
         ) : null}
       </div>
     </div>
-  );
-}
-
-/**
- * Which muscles are being trained, which are only passengers, and which are cold.
- *
- * This replaced a four-week volume-by-pattern chart, and the reason is worth keeping. That
- * section reported a magnitude with nothing to compare it against: no target exists in the
- * schema and it queried a single window, so its only available comparison was between patterns
- * — and tonnage between patterns mostly encodes which muscles are big. A leg press will always
- * dwarf a lateral raise. The app had already retired that same argument once, when the bars on
- * the exercises list became sparklines.
- *
- * It also asked a four-week question on a screen otherwise about now, which is what History is
- * for, and it answered "what am I neglecting" a third time after the pattern strip above and
- * the coverage matrix on History — worse than either, because its units did not convert.
- *
- * Coverage answers something nothing else in the app can. Patterns say a pull happened; only
- * this says the lats and biceps got it while the traps and rear delts did not. And the
- * primary/secondary split says the thing a volume total actively hides: arms and shoulders can
- * carry eleven thousand pounds of work across four weeks without one movement ever being FOR
- * them, which by tonnage looks like plenty and by intent is nothing.
- */
-function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCoverage>> }) {
-  if (!result.ok) {
-    return (
-      <Section label="Coverage" aside={`${COVERAGE_DAYS}d`}>
-        <Fault error={result.error} />
-      </Section>
-    );
-  }
-  // Filtered before anything counts them, so the header total and the rows can never disagree
-  // about what is in scope. Cardiovascular is the one this removes — see REGIONS_OUTSIDE_COVERAGE.
-  const rows = forCoverage(result.rows);
-
-  if (rows.length === 0) {
-    return (
-      <Section label="Coverage" aside={`${COVERAGE_DAYS}d`}>
-        <Empty>No muscles catalogued yet. They arrive with your first exercise.</Empty>
-      </Section>
-    );
-  }
-
-  const regions = groupByRegion(rows);
-  const worked = rows.filter((row) => row.sessions > 0);
-
-  return (
-    <Section label="Coverage" aside={`${worked.length}/${rows.length} muscles · ${COVERAGE_DAYS}d`}>
-      {/* No gap between rows now that each carries its own 40px tap height. Adding one on top
-          of that would space them like paragraphs rather than like a list.
-
-          Nothing follows the rows. Two lines used to: a key explaining what a filled mark meant,
-          and a computed line naming the regions that were worked but never targeted. Both became
-          answers to questions the rows had started answering themselves — opening a region names
-          its three states in words, which is the key, and a region with no Trained line is the
-          passenger reading stated where you are already looking. Explanatory text under a control
-          that explains itself is the kind of thing that accumulates. */}
-      <div>
-        {regions.map((region, i) => (
-          <RegionRow key={region.key} region={region} index={i} />
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-/**
- * One region: its name, a mark per muscle, how many were reached — and its muscles on tap.
- *
- * A mark per muscle rather than a bar, because the question is "how many of these six" and a
- * bar answering it would be a bar of a count — the marks ARE the count, and they carry which
- * ones as well as how many. The same reasoning as the calendar squares, and the same three
- * states: lit, half-lit, and a track that holds the position so a region with one muscle and a
- * region with six stay comparable down the column.
- *
- * The marks say how many and structurally cannot say WHICH, so the row itself opens. This
- * replaced one list at the foot of the section holding all twenty names grouped by state: it
- * answered the question, but only after you had already pointed at a row and were then made to
- * find that region again inside a list somewhere else. Tapping the thing you are asking about
- * and getting its answer directly underneath is the shorter path, and it means each answer is
- * four names rather than twenty.
- */
-function RegionRow({
-  region,
-  index,
-}: {
-  region: { key: string; label: string; rows: MuscleCoverageRow[] };
-  index: number;
-}) {
-  const reached = region.rows.filter((row) => row.sessions > 0).length;
-  // Sorted so the marks read most-trained first and a region's lit end is always on the left.
-  // Unsorted, the alphabetical order of muscle names put the gaps in arbitrary places and the
-  // row's shape stopped meaning anything at a glance. The detail below is built from the same
-  // sorted array, so the marks and the names cannot fall into different orders.
-  const marks = [...region.rows].sort(
-    (a, b) => b.primary_sessions - a.primary_sessions || b.sessions - a.sessions,
-  );
-
-  const states = [
-    { label: 'Trained', tone: 'var(--ink)', rows: marks.filter((r) => r.primary_sessions > 0) },
-    {
-      label: 'Assisting',
-      tone: 'var(--ink-dim)',
-      rows: marks.filter((r) => r.sessions > 0 && r.primary_sessions === 0),
-    },
-    { label: 'Not touched', tone: 'var(--flag)', rows: marks.filter((r) => r.sessions === 0) },
-  ].filter((state) => state.rows.length > 0);
-
-  return (
-    <details className="disclosure is-row">
-      <summary className="pressable">
-        <span className="cap" style={{ color: reached > 0 ? 'var(--ink-dim)' : 'var(--ink-faint)' }}>
-          {region.label}
-        </span>
-
-        <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          {marks.map((row, i) => (
-            <span
-              key={row.muscle}
-              className={row.sessions > 0 ? 'draw-x' : undefined}
-              style={
-                {
-                  flex: 1,
-                  height: row.sessions > 0 ? 8 : 1,
-                  background:
-                    row.primary_sessions > 0
-                      ? 'var(--ink)'
-                      : row.sessions > 0
-                        ? 'var(--ink-faint)'
-                        : 'var(--rule)',
-                  '--delay': `${index * 60 + i * 25}ms`,
-                } as CSSProperties
-              }
-            />
-          ))}
-        </span>
-
-        {/* Always a fraction, never a word. "never" was a third thing to learn in a column that
-            otherwise reads n-of-m, and it made the one row you most need to compare against the
-            others the only row you could not — 0/6 sits in the same scale as 2/4, and "never"
-            sits outside it.
-
-            Only the numerator is flagged, and only at zero. It is the count that is wrong; the
-            denominator is just how many muscles the region has and is the same whether you
-            trained them or not. Amber is the app's established needs-attention colour, the same
-            one on an overdue pattern column and a food with guessed macros. */}
-        <span className="mono" style={{ fontSize: 'var(--t-cap)', textAlign: 'right' }}>
-          <span style={{ color: reached === 0 ? 'var(--flag)' : 'var(--ink)' }}>{reached}</span>
-          <span style={{ color: 'var(--ink-dim)' }}>/{region.rows.length}</span>
-        </span>
-      </summary>
-
-      {/* Indented to where the marks begin, so it reads as belonging to the row above rather
-          than as a new block. One line per state that has anything in it — a region with nothing
-          untouched should not carry an empty "Not touched" saying so. */}
-      <div style={{ paddingLeft: 86, paddingBottom: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {states.map((state) => (
-          <div key={state.label} style={{ fontSize: 'var(--t-sm)', lineHeight: 1.45 }}>
-            <span className="cap" style={{ color: state.tone }}>
-              {state.label}
-            </span>{' '}
-            <span className="selectable" style={{ color: 'var(--ink-dim)' }}>
-              {state.rows.map((row) => row.muscle).join(', ')}
-            </span>
-          </div>
-        ))}
-      </div>
-    </details>
   );
 }

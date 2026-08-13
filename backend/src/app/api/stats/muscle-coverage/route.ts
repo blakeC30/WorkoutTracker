@@ -1,4 +1,4 @@
-import { readEndpoint, intParam } from '@/lib/api-route';
+import { readEndpoint } from '@/lib/api-route';
 import { getMuscleCoverage } from '@/lib/stats';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,9 @@ export const maxDuration = 30;
  * per region" and is what the get_volume_by_muscle MCP tool serves; this one answers "which
  * muscles are being trained at all, and which only as passengers". They disagree on purpose —
  * the volume query counts loaded sets only, which is exactly why it cannot answer this.
+ *
+ * No `days` parameter. The query returns 7, 14 and 28 day counts together so the dashboard's
+ * window toggle costs no request; see the comment on getMuscleCoverage for why that beats a
+ * parameter here.
  */
-export const GET = readEndpoint(async (params) =>
-  getMuscleCoverage(intParam(params, 'days', 28, 365)),
-);
+export const GET = readEndpoint(async () => getMuscleCoverage());

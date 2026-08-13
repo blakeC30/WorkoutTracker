@@ -397,19 +397,52 @@ export async function getBodyweightTrend(days = 90) {
  * history. The section now reads n-of-m for every region with the zero flagged, so none of the
  * three had a consumer, and one of them was a subquery per muscle computing an answer nobody
  * asked for. Restoring a never-versus-not-lately distinction means restoring that subquery.
+ *
+ * ALL THREE WINDOWS COME BACK AT ONCE, rather than the caller asking for one.
+ *
+ * The section offers 7, 14 and 28 days as a toggle, and the alternative shapes are both worse.
+ * A `days` parameter means a round trip on every tap — and on this screen that is a full page
+ * navigation, refetching bodyweight, nutrition and the review count to answer a question about
+ * muscles. Three separate queries means three round trips on every page load to populate a
+ * control most loads never touch. Filtered aggregates give all three from one pass over the
+ * same join: the window predicates cost effectively nothing next to the join itself, and the
+ * toggle becomes instant with no fetch at all.
+ *
+ * The join spans the WIDEST window and each pair of counts narrows from there, so 7 is a subset
+ * of 14 is a subset of 28 by construction — they cannot disagree about a workout the way three
+ * independently-parameterised queries eventually would.
+ *
+ * `web/src/components/Coverage.tsx` names the same three numbers. Duplicated across the two
+ * apps on purpose, as the README says of every other shape crossing this boundary.
  */
-export async function getMuscleCoverage(days = 28) {
+export async function getMuscleCoverage() {
   const sql = getSql();
+
+  // A bounds CTE rather than repeating the timezone expression seven times, the same way
+  // getWeeklySummary does it. Not an interpolated sql fragment: the neon driver turns an
+  // interpolation into a bound PARAMETER, so a nested template would arrive as an object where
+  // Postgres expects a date, rather than as inlined SQL.
   return sql`
-    select m.name                                as muscle,
-           m.region                              as region,
-           count(distinct w.id)::int             as sessions,
-           count(distinct w.id) filter (where em.role = 'primary')::int as primary_sessions
+    with bounds as (
+      select (now() at time zone ${APP_TIMEZONE})::date as today
+    )
+    select m.name   as muscle,
+           m.region as region,
+           count(distinct w.id) filter (where w.entry_date >= b.today - 7)::int  as sessions_7,
+           count(distinct w.id) filter (where w.entry_date >= b.today - 7
+                                          and em.role = 'primary')::int          as primary_7,
+           count(distinct w.id) filter (where w.entry_date >= b.today - 14)::int as sessions_14,
+           count(distinct w.id) filter (where w.entry_date >= b.today - 14
+                                          and em.role = 'primary')::int          as primary_14,
+           count(distinct w.id) filter (where w.entry_date >= b.today - 28)::int as sessions_28,
+           count(distinct w.id) filter (where w.entry_date >= b.today - 28
+                                          and em.role = 'primary')::int          as primary_28
     from muscles m
+    cross join bounds b
     left join exercise_muscles em on em.muscle_id = m.id
     left join workouts w
            on w.exercise_id = em.exercise_id
-          and w.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+          and w.entry_date >= b.today - 28
           -- A workout with no sets is a row nothing was recorded against. Every other "was this
           -- day trained" question in the app joins through workout_sets; this one agrees.
           and exists (select 1 from workout_sets s where s.workout_id = w.id)

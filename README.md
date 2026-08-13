@@ -218,6 +218,20 @@ zero — `0/6` sits in the same scale as `2/4` and can be compared with it, wher
 not. Tapping a region opens it onto its own muscles, named and sorted into those same three
 states.
 
+The window is **7, 14 or 28 days, defaulting to 14** — the shortest span that still describes a
+programme rather than a week. Seven days makes any ordinary split look like neglect: train legs
+on a Monday and by the following Sunday the row reads `0/6` with nothing wrong. Twenty-eight is
+long enough that a muscle dropped three weeks ago still counts as covered. Two weeks is roughly
+two passes through a rotation, so a gap in it is a real gap.
+
+All three windows come back in **one query**, as filtered aggregates over a single join, so
+switching costs no request — the toggle is the only reason that section is a Client Component.
+The alternatives were both worse: a `days` parameter makes every tap a full page navigation that
+refetches bodyweight, nutrition and the review count to answer a question about muscles, and
+three separate queries pay three round trips on every load for a control most loads never touch.
+The join spans the widest window and each pair of counts narrows from there, so 7 is a subset of
+14 is a subset of 28 by construction.
+
 One region is deliberately absent. `full body` holds only `cardiovascular`, which is not a muscle
 anyone neglects — it is primary on every run and secondary on nothing, so its row was a permanent
 `1/1` that could move only if cardio stopped altogether, and whether cardio is happening is

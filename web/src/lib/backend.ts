@@ -114,13 +114,23 @@ export type BodyweightRow = {
  * itself stays — the get_volume_by_muscle MCP tool serves it — but web does not call it.
  */
 
+/**
+ * One muscle, counted over all three windows the Coverage toggle offers.
+ *
+ * `sessions_N` is how many times a movement using this muscle was performed in the last N days,
+ * loaded or not; `primary_N` is how many of those were movements the muscle was FOR. All six
+ * arrive together so switching windows needs no request — see `getMuscleCoverage` in the
+ * backend for why that beats a `days` parameter.
+ */
 export type MuscleCoverageRow = {
   muscle: string;
   region: string;
-  /** Times the movement was performed in the window, loaded or not. */
-  sessions: number;
-  /** Of those, the ones where this muscle was what the movement was FOR. */
-  primary_sessions: number;
+  sessions_7: number;
+  primary_7: number;
+  sessions_14: number;
+  primary_14: number;
+  sessions_28: number;
+  primary_28: number;
 };
 
 export type NutritionRow = {
@@ -372,8 +382,7 @@ export const getCalendar = (from: string, to: string) =>
 export const getDay = (date: string) => queryOne<DayDetail>('/api/stats/day', { date });
 
 export const getBodyweight = (days = 90) => query<BodyweightRow>('/api/stats/bodyweight', { days });
-export const getMuscleCoverage = (days = 28) =>
-  query<MuscleCoverageRow>('/api/stats/muscle-coverage', { days });
+export const getMuscleCoverage = () => query<MuscleCoverageRow>('/api/stats/muscle-coverage');
 export const getNutrition = (days = 30) => query<NutritionRow>('/api/stats/nutrition', { days });
 export const getPrs = (limit = 50) => query<PrRow>('/api/stats/prs', { limit });
 export const getFoods = (days = 30, limit = 60, q?: string) =>
