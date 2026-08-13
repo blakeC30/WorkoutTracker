@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import type { NutritionRow } from '@/lib/backend';
-import { Swatch } from '@/components/ui';
 import { MACROS, macroColor } from '@/lib/macros';
 import { useScrubGesture } from '@/lib/useScrubGesture';
 import { dec, int, shortDay } from '@/lib/format';
@@ -319,30 +318,29 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
 
       {/* Says what the average is over. "30-day avg" across 22 logged days is a different
           number from the one that phrase implies, and the gap is exactly the thing worth
-          knowing. */}
+          knowing.
+
+          It also does the legend's old job now. A swatch row underneath used to name the two
+          series — an amber square for kcal, a stone one for protein — which was a whole extra
+          line of chrome spent restating a mapping the chart could carry itself. Tinting the
+          UNITS here says the same thing in the place the numbers already are: amber is
+          calories, the macro stone is protein, and those are the two colours in the plot above.
+          Same treatment as the P/C/F readout at the top of this chart and the letters in the
+          food list below it.
+
+          The unit is tinted and the number is not, which is the rule everywhere macros are
+          written in this app: the value leads and the label annotates it. */}
       <div className="cap" style={{ marginTop: 8, color: 'var(--ink-dim)' }}>
-        Avg {int(avgCalories)} kcal · {dec(avgProtein, 0)} P
+        Avg {int(avgCalories)}{' '}
+        {/* --signal, not the --signal-low the bars are drawn in. That tone is for a filled area
+            on a dark ground; at 11px it sits below --ink-faint, which DESIGN.md fixes as the
+            floor for anything you have to read. */}
+        <span style={{ color: 'var(--signal)' }}>kcal</span> · {dec(avgProtein, 0)}{' '}
+        <span style={{ color: macroColor('protein') }}>P</span>
         <span style={{ color: 'var(--ink-faint)' }}>
           {' '}
           · {loggedDays.length}/{data.length} days
         </span>
-      </div>
-
-      <div
-        className="cap"
-        style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, color: 'var(--ink-faint)' }}
-      >
-        {/* The chart carries two series in two units, so it has to say which is which. The
-            dashed line is the period average, drawn once rather than as a full grid. */}
-        <span>
-          <Swatch tone="var(--signal-low)" />
-          kcal
-          <span style={{ marginLeft: 12 }}>
-            <Swatch tone={macroColor('protein')} />
-            protein
-          </span>
-        </span>
-        <span>Drag to read</span>
       </div>
     </div>
   );
