@@ -209,6 +209,12 @@ rather than a duplicate.
 > images when the app is installed and does not go looking for new ones. Without a re-add you
 > will keep seeing the white screen and conclude, reasonably but wrongly, that it did not work.
 
+**Pull down at the top of any screen to refetch it.** Everything here is written from a phone conversation with Claude, so "I just logged that, show me" is the most common thing you want from the dashboard — and there was no way to ask for it. Standalone mode has no address bar, and `overscroll-behavior-y: none` deliberately kills the rubber-band, so the only refresh was tapping the tab you were already on. That still works and is still what TabBar's comment describes; it is just no longer the only way.
+
+Because the native bounce is off, the gesture is ours to define rather than to intercept — which is why `touchmove` is registered non-passive in [`web/src/components/PullToRefresh.tsx`](web/src/components/PullToRefresh.tsx). It commits to an axis once, on the first movement past 8px, and gives the gesture up unless it is clearly downward and clearly more vertical than horizontal: the bodyweight and nutrition charts are horizontal scrub surfaces sitting near the top of their screens, and a pull that grabbed any downward component would steal the first frames of a scrub.
+
+The indicator is one hairline at the safe-area top, opening from the centre outward so its width *is* how far you have pulled. It sits at `--signal-low` and goes to full `--signal` at the threshold, which is the moment letting go will do something — colour being the only channel that can say so without moving anything. While refreshing it holds, then fades. No spinner and no looping sweep: nothing in this app animates idly, and a bar that is simply still says "waiting" well enough for the half second it takes. Under `prefers-reduced-motion` the sheet does not move at all, though the hairline still tracks the pull — that is direct manipulation reporting what your finger is doing, not an animation.
+
 **Now** opens with how long since each movement pattern was last trained, because that is the
 only thing on the screen that says what to *do*. Below it, **Coverage** takes the same question
 one level finer: every muscle in the catalog, grouped by region, with a mark each — filled where

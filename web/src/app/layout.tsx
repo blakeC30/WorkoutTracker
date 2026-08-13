@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Azeret_Mono, IBM_Plex_Sans } from 'next/font/google';
 import { TabBar } from '@/components/TabBar';
+import { PullToRefresh } from '@/components/PullToRefresh';
 import { SPLASH_SCREENS, splashMedia, splashSlug } from '@/lib/splash';
 import './globals.css';
 
@@ -74,7 +75,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${mono.variable} ${sans.variable}`}>
       <body>
-        {children}
+        {/* Wraps children only, never the tab bar. A transform creates a containing block for
+            fixed descendants, so translating a parent of TabBar would peel it off the bottom of
+            the screen and drag it down with the page. */}
+        <PullToRefresh>{children}</PullToRefresh>
         <TabBar />
       </body>
     </html>
