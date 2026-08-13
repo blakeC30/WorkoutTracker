@@ -25,6 +25,18 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
   return (
     <main className="screen">
       <Masthead left={dayLabel(date)} right={agoLabel(date)} />
+      {/* Up to the month, the same shape the exercise detail page uses to get back to its list.
+          It used to be the middle slot of the row below, which is the slot that should say where
+          you ARE — and this is the only way back to the month you came from, since a standalone
+          app has no browser back button and the History tab lands on the CURRENT month rather
+          than the one you were browsing. No bottom border here; DayNav's rule closes both. */}
+      <Link
+        href={`/calendar?m=${monthKey(date)}`}
+        className="cap pressable"
+        style={{ color: 'var(--signal)', minHeight: 44, display: 'flex', alignItems: 'center' }}
+      >
+        ‹ {monthShape(monthKey(date)).label}
+      </Link>
       <DayNav date={date} />
       {result.ok ? <Body day={result.row} /> : <Fault error={result.error} />}
     </main>
@@ -55,13 +67,17 @@ function DayNav({ date }: { date: string }) {
       >
         ‹ {shortDay(previous)}
       </Link>
-      <Link
-        href={`/calendar?m=${monthKey(date)}`}
-        className="cap pressable"
-        style={{ color: 'var(--ink-dim)', minHeight: 44, display: 'flex', alignItems: 'center', padding: '0 12px' }}
-      >
-        {monthShape(monthKey(date)).short}
-      </Link>
+      {/* The day you are ON, so the row reads 10 AUG · 11 AUG · 12 AUG and the middle names the
+          thing either arrow moves you away from. It used to be the month, which was the one
+          label in this row that did not name a day — and in a strip of three, the middle slot is
+          where you look to find out where you are.
+
+          Ink rather than --signal, matching the month pager: amber in this row means tappable,
+          since both arrows carry it, and an amber label that does nothing when pressed would be
+          the row contradicting itself. */}
+      <span className="cap" style={{ color: 'var(--ink)', padding: '0 12px' }}>
+        {shortDay(date)}
+      </span>
       {isFuture ? (
         <span className="cap" style={{ color: 'var(--ink-faint)', opacity: 0.4 }}>
           {shortDay(next)} ›
