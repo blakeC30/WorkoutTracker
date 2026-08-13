@@ -313,6 +313,8 @@ Tapping a square opens `/calendar/<date>` with the complete record of that day �
 every exercise, every dish with its portion, and the raw journal text it was parsed from. It is
 the only screen that shows individual sets or journal text; everywhere else is a rollup.
 
+Its food section carries the same macro split bar as Fuel on Now — `MacroBar` in `web/src/components/ui.tsx`, one component so the calorie conversion behind it cannot be written twice and drift. The bar is drawn in CALORIES while the labels under it stay in grams: a gram of fat carries more than twice the energy of a gram of protein, so segments sized by weight draw fat at under half its real contribution. Reviewing a past day is where that reading pays most — "was that a high-fat day" is a question about proportion, and three gram figures do not answer it at a glance.
+
 `exercises.pattern` is what all of that groups by, and it deliberately lives on the exercise
 rather than on the muscle: **the pattern is a property of the movement**.
 

@@ -1,10 +1,10 @@
 import { getBodyweight, getMuscleCoverage, getNutrition, getRecency, getReview, n, n0, type RecencyRow, type FoodRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch } from '@/components/ui';
+import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch, MacroBar } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
 import { Coverage } from '@/components/Coverage';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
-import { MACROS, macroCalories } from '@/lib/macros';
+import { MACROS } from '@/lib/macros';
 import { agoLabel, dayLabel, int, isoWeek, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
 import { signOut } from '@/app/login/actions';
@@ -156,14 +156,6 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
 
   const grams = { protein: n0(row.protein_g), carbs: n0(row.carbs_g), fat: n0(row.fat_g) };
 
-  // Macro grams are not comparable by weight — a gram of fat carries more than twice the
-  // energy of a gram of protein. The split bar is drawn in calories so its widths mean
-  // something; the labels stay in grams because that is how food is logged. The conversion
-  // lives on MACROS beside the colours, since a bar drawn in one and coloured from the other
-  // is exactly where the two would drift apart.
-  const split = MACROS.map((m) => ({ ...m, grams: grams[m.key], kcal: macroCalories(m.key, grams[m.key]) }));
-  const total = split.reduce((sum, m) => sum + m.kcal, 0);
-
   return (
     /*
      * "Today" leads the aside, and it is not decoration.
@@ -177,17 +169,11 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
     <Section label="Fuel" aside={`Today · ${row.items} item${row.items === 1 ? '' : 's'}`}>
       <Figure value={int(n(row.calories))} unit="KCAL" count={n(row.calories)} />
 
-      {total > 0 ? (
-        <div style={{ display: 'flex', height: 8, marginTop: 16, gap: 2 }}>
-          {split.map((m) => (
-            <div key={m.key} style={{ flex: `${(m.kcal / total) * 100} 0 0`, background: m.color }} />
-          ))}
-        </div>
-      ) : null}
+      <MacroBar {...grams} />
 
       <div style={{ display: 'flex', gap: 22, marginTop: 12 }}>
-        {split.map((m) => (
-          <Macro key={m.key} label={m.label} grams={m.grams} tone={m.color} />
+        {MACROS.map((m) => (
+          <Macro key={m.key} label={m.label} grams={grams[m.key]} tone={m.color} />
         ))}
       </div>
     </Section>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDay, n, n0, type DayDetail, type DayJournal, type DayMeal, type DayWorkout } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, Empty, Fault, Macros } from '@/components/ui';
+import { Masthead, Section, Rule, Figure, Empty, Fault, Macros, MacroBar } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS, patternColor, patternLabel } from '@/lib/patterns';
 import { addDays, agoLabel, clock, dayLabel, dec, int, monthKey, monthShape, shortDay, today } from '@/lib/format';
@@ -296,6 +296,11 @@ function Food({ meals }: { meals: DayMeal[] }) {
   return (
     <Section label="Food" aside={`${meals.length} dishes`}>
       <Figure value={int(totals.calories)} unit="KCAL" count={totals.calories} />
+      {/* Same bar, same order, same units as Fuel on the Now screen — figure, then the split,
+          then the grams. This screen is where the reading actually pays: reviewing a past day,
+          "was that a high-fat day" is a question about proportion, and three gram figures do
+          not answer it at a glance the way a split does. */}
+      <MacroBar protein={totals.protein} carbs={totals.carbs} fat={totals.fat} />
       <div style={{ marginTop: 10 }}>
         <Macros protein={totals.protein} carbs={totals.carbs} fat={totals.fat} size="var(--t-sm)" />
       </div>

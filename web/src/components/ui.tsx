@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Counter } from './motion';
-import { MACROS } from '@/lib/macros';
+import { MACROS, macroCalories } from '@/lib/macros';
 
 /*
  * The vocabulary the screens are built from. All of it renders on the server — none of these
@@ -292,6 +292,50 @@ export function Fault({ error }: { error: string }) {
       <p className="selectable" style={{ margin: '4px 0 0', color: 'var(--ink-dim)', fontSize: 'var(--t-sm)' }}>
         {error}
       </p>
+    </div>
+  );
+}
+
+/**
+ * A day's macros as one bar, split by how many CALORIES each contributed.
+ *
+ * Drawn in calories, never in grams, and that is the whole reason it exists. A gram of fat
+ * carries more than twice the energy of a gram of protein, so segments sized by weight draw fat
+ * at under half its real contribution — 50g protein, 50g carbs and 22g fat is a third each in
+ * energy and an 18% sliver of fat by weight. The labels beneath stay in grams, because grams
+ * are how food is logged; the bar and its labels are deliberately in different units.
+ *
+ * It sits under a headline calorie figure on both screens that use it, which is why the top
+ * margin is baked in rather than passed: the two should not drift to different spacings.
+ *
+ * Note what it does NOT do. The denominator is the sum of these three converted to calories,
+ * not the stored calorie total above it, and for an estimated food those can disagree. The bar
+ * always fills its width regardless — it reports a proportion and cannot show a discrepancy.
+ */
+export function MacroBar({
+  protein,
+  carbs,
+  fat,
+}: {
+  protein: number;
+  carbs: number;
+  fat: number;
+}) {
+  const grams = { protein, carbs, fat };
+  const split = MACROS.map((m) => ({ key: m.key, color: m.color, kcal: macroCalories(m.key, grams[m.key]) }));
+  const total = split.reduce((sum, m) => sum + m.kcal, 0);
+
+  // Nothing logged, or a day of foods with no macros on them. An empty strip would be a claim
+  // about the split; no strip is the absence of one.
+  if (total <= 0) return null;
+
+  return (
+    <div style={{ display: 'flex', height: 8, marginTop: 16, gap: 2 }}>
+      {split.map((m) => (
+        // flex-basis 0 with a grow factor, so the widths are the proportions exactly rather
+        // than the proportions plus whatever the content would have been.
+        <div key={m.key} style={{ flex: `${(m.kcal / total) * 100} 0 0`, background: m.color }} />
+      ))}
     </div>
   );
 }
