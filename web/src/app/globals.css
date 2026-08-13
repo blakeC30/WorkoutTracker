@@ -288,6 +288,33 @@ button {
   content: '−';
 }
 
+/* The row variant: the summary IS a line of data, not a word.
+ *
+ * Same mechanics — marker removed, +/− glyph, no cursor — but laid out as the grid the row
+ * needs. The glyph lands in the fourth column on its own, because ::after is a grid item like
+ * any other, which is the whole reason the base rule sets content rather than a pseudo-element
+ * position.
+ *
+ * `min-height` rather than the base rule's height-plus-negative-margin trick: there the 44px
+ * target had to be invisible so a one-word summary did not push the layout around, and here the
+ * row IS the target and should genuinely be that tall. Seven of them make the section taller
+ * than it was, which is the honest cost of every row being tappable. */
+.disclosure.is-row > summary {
+  display: grid;
+  grid-template-columns: 76px 1fr 40px 12px;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  margin: 0;
+  color: inherit;
+}
+
+.disclosure.is-row > summary::after {
+  color: var(--ink-faint);
+  font-size: var(--t-cap);
+  text-align: right;
+}
+
 .pressable {
   transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
 }

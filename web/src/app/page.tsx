@@ -341,7 +341,9 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
 
   return (
     <Section label="Coverage" aside={`${worked.length}/${result.rows.length} muscles · ${COVERAGE_DAYS}d`}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {/* No gap between rows now that each carries its own 40px tap height. Adding one on top
+          of that would space them like paragraphs rather than like a list. */}
+      <div>
         {regions.map((region, i) => (
           <RegionRow key={region.key} region={region} index={i} />
         ))}
@@ -355,86 +357,28 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
           </div>
         ) : null}
         <div className="cap" style={{ color: 'var(--ink-faint)' }}>
-          Filled = trained directly · hollow = assisting only
+          Filled = trained directly · hollow = assisting only · tap a row for its muscles
         </div>
       </div>
-
-      <MuscleList rows={result.rows} />
     </Section>
   );
 }
 
 /**
- * Which muscles are in each state, by name.
- *
- * The rows above say a region got two of its four, and cannot say WHICH two. The names existed
- * only in a `title` attribute, which on the one device this app targets is unreachable — there
- * is no hover on a phone, so that information was effectively not shipped.
- *
- * Grouped by state rather than by region, because that is the shape of the question. "Which have
- * been hit and which haven't" is a question about the three states, and answering it region by
- * region would mean reading seven lists and doing the sorting yourself. The rows above already
- * carry the regional view; this is the other axis, not a repeat of the same one.
- *
- * Behind a disclosure, closed, for the same reason the calendar legend is: Today is a screen
- * read in five seconds, and twenty muscle names permanently in the middle of it would bury the
- * summary they are a detail of. Names are sans — they are things with names, not measurements.
- */
-function MuscleList({ rows }: { rows: MuscleCoverageRow[] }) {
-  const groups = [
-    {
-      key: 'trained',
-      label: 'Trained directly',
-      tone: 'var(--ink)',
-      rows: rows.filter((row) => row.primary_sessions > 0),
-    },
-    {
-      key: 'assisting',
-      label: 'Assisting only',
-      tone: 'var(--ink-dim)',
-      rows: rows.filter((row) => row.sessions > 0 && row.primary_sessions === 0),
-    },
-    {
-      // Amber because it is the actionable one, and amber is already what this app means by
-      // "needs attention" — the same token the overdue pattern columns and the food review
-      // queue use. On the HEADING only: twelve muscle names in flag would be a wall of it.
-      key: 'untouched',
-      label: 'Not touched',
-      tone: 'var(--flag)',
-      rows: rows.filter((row) => row.sessions === 0),
-    },
-  ].filter((group) => group.rows.length > 0);
-
-  return (
-    <details className="disclosure" style={{ marginTop: 10 }}>
-      <summary className="cap pressable">Which muscles</summary>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 4 }}>
-        {groups.map((group) => (
-          <div key={group.key}>
-            <div className="cap" style={{ color: group.tone }}>
-              {group.label} <span style={{ color: 'var(--ink-faint)' }}>{group.rows.length}</span>
-            </div>
-            <div
-              className="selectable"
-              style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-dim)', lineHeight: 1.5, marginTop: 2 }}
-            >
-              {group.rows.map((row) => row.muscle).join(', ')}
-            </div>
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
-
-/**
- * One region: its name, a mark per muscle, and how many of them were reached.
+ * One region: its name, a mark per muscle, how many were reached — and its muscles on tap.
  *
  * A mark per muscle rather than a bar, because the question is "how many of these six" and a
  * bar answering it would be a bar of a count — the marks ARE the count, and they carry which
  * ones as well as how many. The same reasoning as the calendar squares, and the same three
  * states: lit, half-lit, and a track that holds the position so a region with one muscle and a
  * region with six stay comparable down the column.
+ *
+ * The marks say how many and structurally cannot say WHICH, so the row itself opens. This
+ * replaced one list at the foot of the section holding all twenty names grouped by state: it
+ * answered the question, but only after you had already pointed at a row and were then made to
+ * find that region again inside a list somewhere else. Tapping the thing you are asking about
+ * and getting its answer directly underneath is the shorter path, and it means each answer is
+ * four names rather than twenty.
  */
 function RegionRow({
   region,
@@ -446,7 +390,8 @@ function RegionRow({
   const reached = region.rows.filter((row) => row.sessions > 0).length;
   // Sorted so the marks read most-trained first and a region's lit end is always on the left.
   // Unsorted, the alphabetical order of muscle names put the gaps in arbitrary places and the
-  // row's shape stopped meaning anything at a glance.
+  // row's shape stopped meaning anything at a glance. The detail below is built from the same
+  // sorted array, so the marks and the names cannot fall into different orders.
   const marks = [...region.rows].sort(
     (a, b) => b.primary_sessions - a.primary_sessions || b.sessions - a.sessions,
   );
@@ -455,44 +400,72 @@ function RegionRow({
   // distinguishing: one is a lapse and the other is a movement you have never programmed.
   const untouched = region.rows.every((row) => row.days_since_ever === null);
 
+  const states = [
+    { label: 'Trained', tone: 'var(--ink)', rows: marks.filter((r) => r.primary_sessions > 0) },
+    {
+      label: 'Assisting',
+      tone: 'var(--ink-dim)',
+      rows: marks.filter((r) => r.sessions > 0 && r.primary_sessions === 0),
+    },
+    { label: 'Not touched', tone: 'var(--flag)', rows: marks.filter((r) => r.sessions === 0) },
+  ].filter((state) => state.rows.length > 0);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr 40px', alignItems: 'center', gap: 10 }}>
-      <span className="cap" style={{ color: reached > 0 ? 'var(--ink-dim)' : 'var(--ink-faint)' }}>
-        {region.label}
-      </span>
+    <details className="disclosure is-row">
+      <summary className="pressable">
+        <span className="cap" style={{ color: reached > 0 ? 'var(--ink-dim)' : 'var(--ink-faint)' }}>
+          {region.label}
+        </span>
 
-      <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-        {marks.map((row, i) => (
-          <span
-            key={row.muscle}
-            className={row.sessions > 0 ? 'draw-x' : undefined}
-            style={
-              {
-                flex: 1,
-                height: row.primary_sessions > 0 ? 8 : row.sessions > 0 ? 8 : 1,
-                background:
-                  row.primary_sessions > 0
-                    ? 'var(--ink)'
-                    : row.sessions > 0
-                      ? 'var(--ink-faint)'
-                      : 'var(--rule)',
-                '--delay': `${index * 60 + i * 25}ms`,
-              } as CSSProperties
-            }
-          />
+        <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          {marks.map((row, i) => (
+            <span
+              key={row.muscle}
+              className={row.sessions > 0 ? 'draw-x' : undefined}
+              style={
+                {
+                  flex: 1,
+                  height: row.sessions > 0 ? 8 : 1,
+                  background:
+                    row.primary_sessions > 0
+                      ? 'var(--ink)'
+                      : row.sessions > 0
+                        ? 'var(--ink-faint)'
+                        : 'var(--rule)',
+                  '--delay': `${index * 60 + i * 25}ms`,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </span>
+
+        <span
+          className="mono"
+          style={{
+            fontSize: 'var(--t-cap)',
+            textAlign: 'right',
+            color: reached > 0 ? 'var(--ink)' : 'var(--flag)',
+          }}
+        >
+          {untouched ? 'never' : `${reached}/${region.rows.length}`}
+        </span>
+      </summary>
+
+      {/* Indented to where the marks begin, so it reads as belonging to the row above rather
+          than as a new block. One line per state that has anything in it — a region with nothing
+          untouched should not carry an empty "Not touched" saying so. */}
+      <div style={{ paddingLeft: 86, paddingBottom: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {states.map((state) => (
+          <div key={state.label} style={{ fontSize: 'var(--t-sm)', lineHeight: 1.45 }}>
+            <span className="cap" style={{ color: state.tone }}>
+              {state.label}
+            </span>{' '}
+            <span className="selectable" style={{ color: 'var(--ink-dim)' }}>
+              {state.rows.map((row) => row.muscle).join(', ')}
+            </span>
+          </div>
         ))}
-      </span>
-
-      <span
-        className="mono"
-        style={{
-          fontSize: 'var(--t-cap)',
-          textAlign: 'right',
-          color: reached > 0 ? 'var(--ink)' : 'var(--flag)',
-        }}
-      >
-        {untouched ? 'never' : `${reached}/${region.rows.length}`}
-      </span>
-    </div>
+      </div>
+    </details>
   );
 }
