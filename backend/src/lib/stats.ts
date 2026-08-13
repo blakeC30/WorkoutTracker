@@ -374,6 +374,60 @@ export async function getBodyweightTrend(days = 90) {
 }
 
 /**
+ * Which muscles are actually being trained, and which are only along for the ride.
+ *
+ * Deliberately NOT built on volume, which is what `getVolumeByMuscle` below does and why that
+ * one cannot answer this question. It filters to `weight_lbs is not null`, so a set of sit-ups
+ * attributes nothing to abs, a pull-up nothing to lats, and a three-mile run nothing to
+ * cardiovascular — whole regions vanish from its output despite being trained. Coverage counts
+ * a muscle as worked when the movement was PERFORMED, which every kind of training produces.
+ *
+ * The primary/secondary split is the reading worth having. A muscle can accumulate a great deal
+ * of work without a single movement ever being FOR it: presses and rows drive the triceps,
+ * biceps and front delts hard, so those come back "worked, never targeted" — which is a real
+ * training gap and one that a volume total actively hides, since by tonnage they look busy.
+ *
+ * Every muscle in the table is returned, trained or not, because the whole point is what is
+ * missing. A left join, not an inner one: an inner join answers "what did I train" and this
+ * question is the other one.
+ *
+ * Two recencies. `days_since` is inside the window and drives the section; `days_since_ever`
+ * ignores it, so "not in the last four weeks" can be told apart from "never once", which are
+ * very different things to read about your own legs.
+ */
+export async function getMuscleCoverage(days = 28) {
+  const sql = getSql();
+  return sql`
+    select m.name                                as muscle,
+           m.region                              as region,
+           count(distinct w.id)::int             as sessions,
+           count(distinct w.id) filter (where em.role = 'primary')::int as primary_sessions,
+           max(w.entry_date)::text               as last_trained,
+           case when max(w.entry_date) is null then null
+                else ((now() at time zone ${APP_TIMEZONE})::date - max(w.entry_date))::int
+           end                                   as days_since,
+           (
+             select case when max(w2.entry_date) is null then null
+                         else ((now() at time zone ${APP_TIMEZONE})::date - max(w2.entry_date))::int
+                    end
+             from workouts w2
+             join exercise_muscles em2 on em2.exercise_id = w2.exercise_id
+             where em2.muscle_id = m.id
+               and exists (select 1 from workout_sets s2 where s2.workout_id = w2.id)
+           )                                     as days_since_ever
+    from muscles m
+    left join exercise_muscles em on em.muscle_id = m.id
+    left join workouts w
+           on w.exercise_id = em.exercise_id
+          and w.entry_date >= (now() at time zone ${APP_TIMEZONE})::date - ${days}::int
+          -- A workout with no sets is a row nothing was recorded against. Every other "was this
+          -- day trained" question in the app joins through workout_sets; this one agrees.
+          and exists (select 1 from workout_sets s where s.workout_id = w.id)
+    group by m.id, m.name, m.region
+    order by m.region, m.name`;
+}
+
+/**
  * Training volume by muscle region.
  *
  * The fan-out here is the trap: joining sets straight to exercise_muscles multiplies a

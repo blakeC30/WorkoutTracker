@@ -107,12 +107,24 @@ export type BodyweightRow = {
   weight_lbs: Num;
 };
 
-export type MuscleRow = {
+/*
+ * `MuscleRow` and its `getMuscles` fetcher used to sit here, typing the volume-by-region
+ * endpoint. The chart that read them was removed from Today long ago and nothing replaced the
+ * call, so they had been dead for months while still reading as live API surface. The endpoint
+ * itself stays — the get_volume_by_muscle MCP tool serves it — but web does not call it.
+ */
+
+export type MuscleCoverageRow = {
+  muscle: string;
   region: string;
-  primary_volume_lbs: Num;
-  secondary_volume_lbs: Num;
+  /** Times the movement was performed in the window, loaded or not. */
+  sessions: number;
+  /** Of those, the ones where this muscle was what the movement was FOR. */
   primary_sessions: number;
-  secondary_sessions: number;
+  last_trained: string | null;
+  days_since: number | null;
+  /** Ignores the window, so "not lately" and "not ever" can be told apart. */
+  days_since_ever: number | null;
 };
 
 export type NutritionRow = {
@@ -364,7 +376,8 @@ export const getCalendar = (from: string, to: string) =>
 export const getDay = (date: string) => queryOne<DayDetail>('/api/stats/day', { date });
 
 export const getBodyweight = (days = 90) => query<BodyweightRow>('/api/stats/bodyweight', { days });
-export const getMuscles = (days = 28) => query<MuscleRow>('/api/stats/muscles', { days });
+export const getMuscleCoverage = (days = 28) =>
+  query<MuscleCoverageRow>('/api/stats/muscle-coverage', { days });
 export const getNutrition = (days = 30) => query<NutritionRow>('/api/stats/nutrition', { days });
 export const getPrs = (limit = 50) => query<PrRow>('/api/stats/prs', { limit });
 export const getFoods = (days = 30, limit = 60, q?: string) =>

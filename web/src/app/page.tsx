@@ -1,10 +1,12 @@
-import { getBodyweight, getNutrition, getRecency, getReview, getVolumeByPattern, n, n0, type RecencyRow, type FoodRow, type PatternVolumeRow } from '@/lib/backend';
-import { Masthead, Section, Rule, Figure, BarRow, Empty, Fault, Swatch } from '@/components/ui';
+import { getBodyweight, getMuscleCoverage, getNutrition, getRecency, getReview, n, n0, type RecencyRow, type FoodRow, type MuscleCoverageRow } from '@/lib/backend';
+import type { CSSProperties } from 'react';
+import { Masthead, Section, Rule, Figure, Empty, Fault, Swatch } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { WeightChart } from '@/components/WeightChart';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
+import { groupByRegion } from '@/lib/muscles';
 import { MACROS, macroCalories } from '@/lib/macros';
-import { agoLabel, compact, dayLabel, dec, int, isoWeek, toIso } from '@/lib/format';
+import { agoLabel, dayLabel, int, isoWeek, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
 import { signOut } from '@/app/login/actions';
 import Link from 'next/link';
@@ -20,9 +22,9 @@ export const dynamic = 'force-dynamic';
  */
 export default async function Today() {
   // Fetched together rather than in sequence; four round trips to Vercel add up on cellular.
-  const [weight, patterns, nutrition, review, recency] = await Promise.all([
+  const [weight, coverage, nutrition, review, recency] = await Promise.all([
     getBodyweight(90),
-    getVolumeByPattern(28),
+    getMuscleCoverage(28),
     getNutrition(7),
     getReview(25),
     getRecency(),
@@ -53,7 +55,7 @@ export default async function Today() {
       </Reveal>
       <Rule />
       <Reveal delay={180}>
-        <Volume result={patterns} />
+        <Coverage result={coverage} />
       </Reveal>
 
       {review.ok && review.rows.length > 0 ? (
@@ -280,129 +282,142 @@ function Gap({ row }: { row: RecencyRow }) {
 }
 
 /**
- * Four weeks of work, by movement pattern, in whatever units it was recorded in.
+ * Which muscles are being trained, which are only passengers, and which are cold.
  *
- * Bars are tonnage only, because tonnage is the one measure comparable between patterns. Reps,
- * miles and minutes each get named underneath rather than being folded in — converting between
- * them would need an invented exchange rate, and dropping them made a month of situps or a run
- * logged without a stopwatch look like nothing happened.
+ * This replaced a four-week volume-by-pattern chart, and the reason is worth keeping. That
+ * section reported a magnitude with nothing to compare it against: no target exists in the
+ * schema and it queried a single window, so its only available comparison was between patterns
+ * — and tonnage between patterns mostly encodes which muscles are big. A leg press will always
+ * dwarf a lateral raise. The app had already retired that same argument once, when the bars on
+ * the exercises list became sparklines.
+ *
+ * It also asked a four-week question on a screen otherwise about now, which is what History is
+ * for, and it answered "what am I neglecting" a third time after the pattern strip above and
+ * the coverage matrix on History — worse than either, because its units did not convert.
+ *
+ * Coverage answers something nothing else in the app can. Patterns say a pull happened; only
+ * this says the lats and biceps got it while the traps and rear delts did not. And the
+ * primary/secondary split says the thing a volume total actively hides: arms and shoulders can
+ * carry eleven thousand pounds of work across four weeks without one movement ever being FOR
+ * them, which by tonnage looks like plenty and by intent is nothing.
  */
-function Volume({ result }: { result: Awaited<ReturnType<typeof getVolumeByPattern>> }) {
+function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCoverage>> }) {
   if (!result.ok) {
     return (
-      <Section label="Volume" aside="28d">
+      <Section label="Coverage" aside="28d">
         <Fault error={result.error} />
       </Section>
     );
   }
-
-  const byPattern = new Map(result.rows.map((r) => [r.pattern, r]));
-  // PATTERN_ROWS, not PATTERNS: the five have calendar slots, but a list can carry the
-  // catch-all too. Iterating the five dropped sports entirely — 75 minutes of basketball
-  // reported as nothing at all.
-  const trained = PATTERN_ROWS.map((p) => ({ pattern: p, row: byPattern.get(p.key) }))
-    .filter((entry) => entry.row !== undefined)
-    .map((entry) => ({ ...entry, measures: measuresOf(entry.row) }))
-    // A pattern the query returned but which produced no measurable work at all — possible if
-    // sets were logged with no reps, weight, distance or duration on any of them.
-    .filter((entry) => entry.measures.length > 0);
-
-  if (trained.length === 0) {
+  if (result.rows.length === 0) {
     return (
-      <Section label="Volume" aside="28d">
-        <Empty>Nothing logged in the last four weeks.</Empty>
+      <Section label="Coverage" aside="28d">
+        <Empty>No muscles catalogued yet. They arrive with your first exercise.</Empty>
       </Section>
     );
   }
 
-  // The bar is tonnage and only tonnage, because tonnage is the one measure that means the same
-  // thing from one pattern to the next. Patterns with none get a row with no bar, not no row.
-  const tonnage = (entry: (typeof trained)[number]) => n0(entry.row?.volume_lbs);
-  const max = Math.max(...trained.map(tonnage), 1);
-  const total = trained.reduce((sum, entry) => sum + tonnage(entry), 0);
+  const regions = groupByRegion(result.rows);
+  const worked = result.rows.filter((row) => row.sessions > 0);
+
+  // Regions carrying real work where nothing was ever the target. The reading this section was
+  // built for, so it is stated in words rather than left to be inferred from dimmer marks.
+  const passengers = regions.filter(
+    (region) =>
+      region.rows.some((row) => row.sessions > 0) &&
+      region.rows.every((row) => row.primary_sessions === 0),
+  );
 
   return (
-    <Section label="Volume" aside="28d">
-      {trained.map((entry, i) => (
-        <BarRow
-          key={entry.pattern.key}
-          index={i}
-          label={
-            <>
-              {/* The swatch, not the bar, is what ties a row to its pattern colour. A row
-                  measured in miles has no bar to be coloured, and losing the colour on exactly
-                  the rows that are not tonnage would make the palette look like it encodes
-                  "loaded" rather than "which pattern". */}
-              <Swatch tone={entry.pattern.color} />
-              {patternLabel(entry.pattern.key)}
-            </>
-          }
-          value={tonnage(entry)}
-          max={max}
-          tone={entry.pattern.color}
-          display={<Measures parts={entry.measures} />}
-        />
-      ))}
+    <Section label="Coverage" aside={`${worked.length}/${result.rows.length} muscles`}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {regions.map((region, i) => (
+          <RegionRow key={region.key} region={region} index={i} />
+        ))}
+      </div>
 
-      {total > 0 ? (
-        <div className="cap" style={{ marginTop: 10, textAlign: 'right', color: 'var(--ink-faint)' }}>
-          {int(total)} lb lifted
+      {/* Two lines at most, and only when they have something to say. */}
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {passengers.length > 0 ? (
+          <div className="cap" style={{ color: 'var(--flag)' }}>
+            {passengers.map((r) => r.label).join(' · ')} — worked, never targeted
+          </div>
+        ) : null}
+        <div className="cap" style={{ color: 'var(--ink-faint)' }}>
+          Filled = trained directly · hollow = assisting only
         </div>
-      ) : null}
+      </div>
     </Section>
   );
 }
 
-/** One measure a pattern actually recorded: a number and the unit it was recorded in. */
-type Measure = { value: string; unit: string };
-
 /**
- * Everything a pattern accumulated, in the units it accumulated it in.
+ * One region: its name, a mark per muscle, and how many of them were reached.
  *
- * Deliberately not "the unit for this pattern". Core is not only planks — situps and crunches
- * are unloaded REPS while a weighted cable crunch is tonnage, so one pattern can legitimately
- * produce three measures in four weeks. Cardio is the same: a run may carry miles, minutes, or
- * both. Assuming one unit per pattern printed "Core — min" for a month of situps and
- * "3.0 mi · — min" for a run logged without a stopwatch.
- *
- * Tonnage leads when there is any, because it is the measure the bar beside it is drawn from.
+ * A mark per muscle rather than a bar, because the question is "how many of these six" and a
+ * bar answering it would be a bar of a count — the marks ARE the count, and they carry which
+ * ones as well as how many. The same reasoning as the calendar squares, and the same three
+ * states: lit, half-lit, and a track that holds the position so a region with one muscle and a
+ * region with six stay comparable down the column.
  */
-function measuresOf(row: PatternVolumeRow | undefined): Measure[] {
-  const parts: Measure[] = [];
-  const push = (value: number | null, format: (v: number) => string, unit: string) => {
-    if (value !== null && value > 0) parts.push({ value: format(value), unit });
-  };
-  push(n(row?.volume_lbs), (v) => compact(v), 'lb');
-  push(n(row?.bodyweight_reps), (v) => int(v), 'reps');
-  push(n(row?.distance_mi), (v) => dec(v, 1), 'mi');
-  push(n(row?.duration_min), (v) => int(v), 'min');
-  return parts;
-}
+function RegionRow({
+  region,
+  index,
+}: {
+  region: { key: string; label: string; rows: MuscleCoverageRow[] };
+  index: number;
+}) {
+  const reached = region.rows.filter((row) => row.sessions > 0).length;
+  // Sorted so the marks read most-trained first and a region's lit end is always on the left.
+  // Unsorted, the alphabetical order of muscle names put the gaps in arbitrary places and the
+  // row's shape stopped meaning anything at a glance.
+  const marks = [...region.rows].sort(
+    (a, b) => b.primary_sessions - a.primary_sessions || b.sessions - a.sessions,
+  );
 
-/**
- * A pattern's measures on one line: `2.7k lb · 4 reps`.
- *
- * This is the fix for the section's oldest wrong idea. Tonnage used to be drawn as bars and
- * everything else listed separately underneath, which meant a pattern doing both appeared
- * TWICE — pull showed up as a 2.7k bar for barbell rows and again below as "4 reps" for
- * pull-ups, reading as two different patterns that happened to share a name. A pattern is one
- * thing and gets one row; the units it was measured in belong inside that row, not in a second
- * list keyed by the same name.
- *
- * Units stay dimmed so a scan down the column reads the numbers first, and the separator is the
- * same interpunct the app uses everywhere else for "and also".
- */
-function Measures({ parts }: { parts: Measure[] }) {
+  // Never trained at all, in the whole history — not merely quiet for four weeks. Worth
+  // distinguishing: one is a lapse and the other is a movement you have never programmed.
+  const untouched = region.rows.every((row) => row.days_since_ever === null);
+
   return (
-    <>
-      {parts.map((part, i) => (
-        <span key={part.unit} style={{ whiteSpace: 'nowrap' }}>
-          {i > 0 ? <span style={{ color: 'var(--ink-faint)' }}> · </span> : null}
-          {part.value}
-          <span style={{ color: 'var(--ink-dim)', marginLeft: 3 }}>{part.unit}</span>
-        </span>
-      ))}
-    </>
+    <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr 40px', alignItems: 'center', gap: 10 }}>
+      <span className="cap" style={{ color: reached > 0 ? 'var(--ink-dim)' : 'var(--ink-faint)' }}>
+        {region.label}
+      </span>
+
+      <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        {marks.map((row, i) => (
+          <span
+            key={row.muscle}
+            className={row.sessions > 0 ? 'draw-x' : undefined}
+            title={row.muscle}
+            style={
+              {
+                flex: 1,
+                height: row.primary_sessions > 0 ? 8 : row.sessions > 0 ? 8 : 1,
+                background:
+                  row.primary_sessions > 0
+                    ? 'var(--ink)'
+                    : row.sessions > 0
+                      ? 'var(--ink-faint)'
+                      : 'var(--rule)',
+                '--delay': `${index * 60 + i * 25}ms`,
+              } as CSSProperties
+            }
+          />
+        ))}
+      </span>
+
+      <span
+        className="mono"
+        style={{
+          fontSize: 'var(--t-cap)',
+          textAlign: 'right',
+          color: reached > 0 ? 'var(--ink)' : 'var(--flag)',
+        }}
+      >
+        {untouched ? 'never' : `${reached}/${region.rows.length}`}
+      </span>
+    </div>
   );
 }
-

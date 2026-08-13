@@ -156,64 +156,18 @@ export function Delta({
   );
 }
 
-/**
- * A horizontal bar row: label, bar, value.
+/*
+ * `BarRow` used to sit here — label, a bar, a value.
  *
- * Two divs and a width percentage. Reaching for a charting library to draw this would ship a
- * client bundle and a set of defaults to override, for a rectangle.
+ * Its only caller was Today's volume-by-pattern section, which was replaced by muscle coverage:
+ * that section compared tonnage between patterns, and tonnage between patterns mostly encodes
+ * which muscles are big. Coverage counts marks instead of drawing lengths, so nothing in the
+ * app renders a proportional bar any more and this became vocabulary no screen speaks.
+ *
+ * Not kept "in case". The bar rows it drew are twelve lines of grid and a width percentage, and
+ * a component preserved for a caller that does not exist is the thing that quietly drifts out
+ * of step with the design it claims to encode.
  */
-export function BarRow({
-  label,
-  value,
-  max,
-  display,
-  tone = 'var(--signal)',
-  index = 0,
-}: {
-  /** Nodes, not strings: a row may need a swatch beside its name, or a dimmed unit after its
-      value. Both are still a single line — this is not licence to nest a layout in here. */
-  label: ReactNode;
-  value: number;
-  max: number;
-  display: ReactNode;
-  tone?: string;
-  /** Position in its list, used only to stagger the draw. */
-  index?: number;
-}) {
-  // A zero value draws no bar at all rather than a stub or an empty track. Rows here can be
-  // measured in units the bar does not speak, and a visible-but-empty bar next to "45 reps"
-  // says "you did none of this", which is the opposite of what such a row is reporting.
-  const pct = max > 0 ? Math.max(value / max, 0) * 100 : 0;
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '78px 1fr auto', alignItems: 'center', gap: 10, height: 26 }}>
-      <span className="cap" style={{ color: 'var(--ink-dim)', letterSpacing: '0.08em' }}>
-        {label}
-      </span>
-      {/* Both bars draw to length on arrival. The width in the HTML is already final — the
-          animation is scaleX from 0, so it composites on the GPU and never reflows the row.
-          Each row starts a beat after the one above it, which reads as the list filling in
-          rather than as five things twitching at once. */}
-      <div style={{ position: 'relative', height: 10 }}>
-        <div
-          className="draw-x"
-          style={
-            {
-              position: 'absolute',
-              inset: '0 auto 0 0',
-              width: `${pct}%`,
-              background: tone,
-              '--delay': `${index * 70}ms`,
-            } as CSSProperties
-          }
-        />
-      </div>
-      <span className="mono" style={{ fontSize: 'var(--t-sm)', color: 'var(--ink)' }}>
-        {display}
-      </span>
-    </div>
-  );
-}
 
 /**
  * An inline sparkline, drawn as an SVG path on the server.

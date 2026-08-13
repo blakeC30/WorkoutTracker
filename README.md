@@ -210,23 +210,38 @@ rather than a duplicate.
 > will keep seeing the white screen and conclude, reasonably but wrongly, that it did not work.
 
 **Today** opens with how long since each movement pattern was last trained, because that is the
-only thing on the screen that says what to *do*. Volume below it is grouped by pattern, **one
-row per pattern and never more**, because a pattern is one thing however many units it was
-measured in.
+only thing on the screen that says what to *do*. Below it, **Coverage** takes the same question
+one level finer: every muscle in the catalog, grouped by region, with a mark each — filled where
+a movement was *for* that muscle, hollow where it only assisted, and a hairline track where it
+was not touched at all. A region nothing has ever reached reads `never` rather than `0/6`, since
+a lapse and a movement you have never programmed are different problems.
 
-That last part is the whole difficulty of the section. A single pattern can accumulate work that
-does not convert: pull is barbell rows in pounds *and* pull-ups in reps, core is weighted
-crunches in pounds *and* situps in reps, cardio is miles *and* minutes. Tonnage used to be drawn
-as bars with everything else listed separately underneath, which meant a pattern doing both
-appeared twice — pull as a 2.7k bar and again as "4 reps", reading as two patterns sharing a
-name. Now each row carries every unit that pattern recorded, tonnage first: `PULL │ ████ │ 2.7k
-lb · 4 reps`.
+The primary/secondary split is the reading it exists for. Presses and rows drive the triceps,
+biceps and front delts hard without a single movement ever being *for* them, so those regions
+come back **worked, never targeted** — a real gap that a volume total actively hides, because by
+tonnage they look busy. Nothing else in the app can say it: a pattern says a pull happened, and
+only this says the lats got it while the traps and rear delts did not.
 
-The bar is tonnage and only tonnage, since that is the one measure comparable between patterns.
-A pattern with none gets a row with no bar rather than no row — an empty bar next to "45 reps"
-would say "you did none of this", which is the opposite of what the row reports — and the
-pattern colour rides on a swatch beside the label rather than on the bar, so a row measured in
-miles is still visibly cardio.
+It is built on *performance*, never tonnage. `getVolumeByMuscle` — which the `get_volume_by_muscle`
+MCP tool serves — filters to loaded sets, so sit-ups attribute nothing to abs, pull-ups nothing
+to lats, and a three-mile run nothing to cardiovascular; whole regions vanish from its output
+despite being trained. `getMuscleCoverage` counts a muscle as worked when the movement was
+performed, which every kind of training produces. The two disagree on purpose.
+
+Coverage replaced a four-week volume-by-pattern chart, and that removal is worth recording.
+Volume reported a magnitude with nothing to compare it against — no target exists in the schema
+and it queried a single window — so its only available comparison was *between* patterns, and
+tonnage between patterns mostly encodes which muscles are big. A leg press will always dwarf a
+lateral raise. That argument had already been made once here, when the bars on the exercises
+list became sparklines, and it applies just as well one level up. It also asked a four-week
+question on a screen otherwise about *now*, and answered "what am I neglecting" a third time
+after the pattern strip above it and the coverage matrix on History.
+
+Regions are drawn in ink, never in the pattern palette. They are a second taxonomy sitting one
+section below the first, and colouring them is the fastest way to make the pattern colours stop
+meaning anything — so what varies is how lit a mark is, not what colour it is. The order in
+`web/src/lib/muscles.ts` runs roughly top of the body down rather than alphabetically, because
+alphabetical buries legs in the middle and legs is the row most likely to be the problem.
 
 **Exercises** is the `exercises` catalog with a record and a trend on each — the counterpart to
 the Food tab, which browses the other catalog. It splits into Loaded, Bodyweight and Cardio by
