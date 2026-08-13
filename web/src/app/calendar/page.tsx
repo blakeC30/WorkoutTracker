@@ -174,7 +174,7 @@ function Grid({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }
           new and once after a row is added — so it earns a line, not a permanent block above the
           fold. Each label is tinted to match its own slot, and the rows are in the squares' own
           top-to-bottom order, which is the whole reason this reads as a key rather than a list. */}
-      <details className="legend" style={{ marginTop: 14 }}>
+      <details className="disclosure" style={{ marginTop: 14 }}>
         <summary className="cap pressable">Legend</summary>
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 7, paddingBottom: 4 }}>
           <LegendRow items={[{ label: 'Weighed in', tone: 'var(--ink-faint)' }]} height={3} />

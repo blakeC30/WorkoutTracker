@@ -253,15 +253,17 @@ button {
   appearance: none;
 }
 
-/* A disclosure that costs no JavaScript and holds no state — the calendar legend is the only
-   one. `<details>` is used rather than a Client Component because the whole page is otherwise
-   server-rendered, and a boolean the browser already tracks is not worth a hydration boundary.
+/* A disclosure that costs no JavaScript and holds no state. Two of them: the calendar legend,
+   and the muscle list under Coverage. `<details>` rather than a Client Component, because those
+   pages are otherwise server-rendered and a boolean the browser already tracks is not worth a
+   hydration boundary. Named for the mechanism rather than for the legend that happened to need
+   it first, since the second use was not a legend at all.
  *
  * Safari draws its own triangle through ::-webkit-details-marker, which no amount of
  * `list-style: none` removes on the iOS versions this targets — so both are set. The marker is
  * replaced by a +/− glyph after the label: there are no icons in this app, and a disclosure with
  * nothing to show it opens reads as a dead heading. */
-.legend > summary {
+.disclosure > summary {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -274,15 +276,15 @@ button {
   cursor: default;
 }
 
-.legend > summary::-webkit-details-marker {
+.disclosure > summary::-webkit-details-marker {
   display: none;
 }
 
-.legend > summary::after {
+.disclosure > summary::after {
   content: '+';
 }
 
-.legend[open] > summary::after {
+.disclosure[open] > summary::after {
   content: '−';
 }
 

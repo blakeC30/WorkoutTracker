@@ -358,7 +358,72 @@ function Coverage({ result }: { result: Awaited<ReturnType<typeof getMuscleCover
           Filled = trained directly · hollow = assisting only
         </div>
       </div>
+
+      <MuscleList rows={result.rows} />
     </Section>
+  );
+}
+
+/**
+ * Which muscles are in each state, by name.
+ *
+ * The rows above say a region got two of its four, and cannot say WHICH two. The names existed
+ * only in a `title` attribute, which on the one device this app targets is unreachable — there
+ * is no hover on a phone, so that information was effectively not shipped.
+ *
+ * Grouped by state rather than by region, because that is the shape of the question. "Which have
+ * been hit and which haven't" is a question about the three states, and answering it region by
+ * region would mean reading seven lists and doing the sorting yourself. The rows above already
+ * carry the regional view; this is the other axis, not a repeat of the same one.
+ *
+ * Behind a disclosure, closed, for the same reason the calendar legend is: Today is a screen
+ * read in five seconds, and twenty muscle names permanently in the middle of it would bury the
+ * summary they are a detail of. Names are sans — they are things with names, not measurements.
+ */
+function MuscleList({ rows }: { rows: MuscleCoverageRow[] }) {
+  const groups = [
+    {
+      key: 'trained',
+      label: 'Trained directly',
+      tone: 'var(--ink)',
+      rows: rows.filter((row) => row.primary_sessions > 0),
+    },
+    {
+      key: 'assisting',
+      label: 'Assisting only',
+      tone: 'var(--ink-dim)',
+      rows: rows.filter((row) => row.sessions > 0 && row.primary_sessions === 0),
+    },
+    {
+      // Amber because it is the actionable one, and amber is already what this app means by
+      // "needs attention" — the same token the overdue pattern columns and the food review
+      // queue use. On the HEADING only: twelve muscle names in flag would be a wall of it.
+      key: 'untouched',
+      label: 'Not touched',
+      tone: 'var(--flag)',
+      rows: rows.filter((row) => row.sessions === 0),
+    },
+  ].filter((group) => group.rows.length > 0);
+
+  return (
+    <details className="disclosure" style={{ marginTop: 10 }}>
+      <summary className="cap pressable">Which muscles</summary>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 4 }}>
+        {groups.map((group) => (
+          <div key={group.key}>
+            <div className="cap" style={{ color: group.tone }}>
+              {group.label} <span style={{ color: 'var(--ink-faint)' }}>{group.rows.length}</span>
+            </div>
+            <div
+              className="selectable"
+              style={{ fontSize: 'var(--t-sm)', color: 'var(--ink-dim)', lineHeight: 1.5, marginTop: 2 }}
+            >
+              {group.rows.map((row) => row.muscle).join(', ')}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -401,7 +466,6 @@ function RegionRow({
           <span
             key={row.muscle}
             className={row.sessions > 0 ? 'draw-x' : undefined}
-            title={row.muscle}
             style={
               {
                 flex: 1,
