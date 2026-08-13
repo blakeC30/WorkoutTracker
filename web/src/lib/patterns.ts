@@ -39,9 +39,9 @@ export const OTHER_PATTERN = {
  * Everything that can appear as a ROW in a list, as opposed to a slot in a calendar square.
  *
  * The distinction is the point: the square has five fixed positions and its legibility depends
- * on that staying true, but a list can grow. Sports used to be dropped from Today's volume, the
- * coverage matrix and last-trained entirely, because those all iterated the five — 75 minutes of
- * basketball reported as nothing at all.
+ * on that staying true, but a list can grow. Sports used to be dropped from last-trained, the
+ * coverage matrix and the volume section that used to sit on Now, because those all iterated the
+ * five — 75 minutes of basketball reported as nothing at all.
  */
 export const PATTERN_ROWS = [...PATTERNS, OTHER_PATTERN] as const;
 

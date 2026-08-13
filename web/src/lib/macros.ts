@@ -2,7 +2,7 @@
  * The three macros, their tones and their energy density, in one place.
  *
  * The same reasoning as `patterns.ts`: every screen that shows macros imports this, so protein
- * cannot be amber on Today and grey in a chart legend. That had already happened — Today drew
+ * cannot be amber on Now and grey in a chart legend. That had already happened — Now drew
  * protein in `--signal` and fat in `--signal-low`, the nutrition chart drew CALORIES in
  * `--signal-low` and protein in `--ink-dim`, and the food list drew all three in one colour and
  * relied on the letters. Three screens, three answers, and one of them said fat and calories

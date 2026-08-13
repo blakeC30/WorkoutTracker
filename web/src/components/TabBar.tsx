@@ -10,8 +10,10 @@ import { usePathname, useRouter } from 'next/navigation';
  * filled pill, which matches how the rest of the app separates things.
  */
 const TABS = [
-  { href: '/', label: 'Today' },
-  // Four tabs, one question each: now / over time / exercises / food. "Week" used to sit between
+  { href: '/', label: 'Now' },
+  // Four tabs, one question each: now / over time / exercises / food. The first was labelled
+  // "Today", which claimed more than it delivered — one of its five sections is scoped to the
+  // day and the rest read 28 and 90 day windows. "Week" used to sit between
   // the first two and answered the same question as this one at a different zoom, so its
   // eight-week ledger moved onto this screen and the tab went away.
   { href: '/calendar', label: 'History' },

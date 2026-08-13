@@ -109,7 +109,7 @@ export type BodyweightRow = {
 
 /*
  * `MuscleRow` and its `getMuscles` fetcher used to sit here, typing the volume-by-region
- * endpoint. The chart that read them was removed from Today long ago and nothing replaced the
+ * endpoint. The chart that read them was removed from Now long ago and nothing replaced the
  * call, so they had been dead for months while still reading as live API surface. The endpoint
  * itself stays — the get_volume_by_muscle MCP tool serves it — but web does not call it.
  */
@@ -379,5 +379,5 @@ export const getPrs = (limit = 50) => query<PrRow>('/api/stats/prs', { limit });
 export const getFoods = (days = 30, limit = 60, q?: string) =>
   query<FoodRow>('/api/stats/foods', q ? { days, limit, q } : { days, limit });
 
-/** Only the flagged ones, all-time. Used for the count on Today. */
+/** Only the flagged ones, all-time. Used for the count on Now. */
 export const getReview = (limit = 25) => query<FoodRow>('/api/stats/review', { limit });

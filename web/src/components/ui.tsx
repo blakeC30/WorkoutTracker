@@ -159,7 +159,7 @@ export function Delta({
 /*
  * `BarRow` used to sit here — label, a bar, a value.
  *
- * Its only caller was Today's volume-by-pattern section, which was replaced by muscle coverage:
+ * Its only caller was the Now screen's volume-by-pattern section, which was replaced by muscle coverage:
  * that section compared tonnage between patterns, and tonnage between patterns mostly encodes
  * which muscles are big. Coverage counts marks instead of drawing lengths, so nothing in the
  * app renders a proportional bar any more and this became vocabulary no screen speaks.
@@ -332,7 +332,7 @@ export function Macros({
  * Only the letter, because these sit in a dense row under a food name and three differently
  * lit numbers would read as three different states rather than three quantities. The letter is
  * the part that says WHICH macro, so it is the part the colour belongs on — and it makes the
- * ramp mean the same thing here as it does in the split bar on Today.
+ * ramp mean the same thing here as it does in the split bar on Now.
  */
 function MacroPair({ value, unit, tone }: { value: number | null; unit: string; tone: string }) {
   return (

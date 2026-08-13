@@ -174,7 +174,7 @@ someone else's failures can never lock *you* out.
 
 ## The dashboard
 
-Four screens — **Today**, **History**, **Exercises**, **Food** — built for one device: an iPhone 13
+Four screens — **Now**, **History**, **Exercises**, **Food** — built for one device: an iPhone 13
 Pro added to the home screen. There are no width breakpoints anywhere in `web/`, on purpose.
 
 One question per tab: *now / over time / exercises / food*. There used to be a fifth, Week, whose
@@ -209,7 +209,7 @@ rather than a duplicate.
 > images when the app is installed and does not go looking for new ones. Without a re-add you
 > will keep seeing the white screen and conclude, reasonably but wrongly, that it did not work.
 
-**Today** opens with how long since each movement pattern was last trained, because that is the
+**Now** opens with how long since each movement pattern was last trained, because that is the
 only thing on the screen that says what to *do*. Below it, **Coverage** takes the same question
 one level finer: every muscle in the catalog, grouped by region, with a mark each — filled where
 a movement was *for* that muscle, hollow where it only assisted, and a hairline track where it
@@ -272,7 +272,7 @@ Nothing else in the app can distinguish a lift that added 40lb last month from o
 since June.
 
 **History** is the calendar, and it encodes **kind and presence rather than magnitude** — how
-much you lifted is answered better on Today and Food, while what only a calendar can answer is
+much you lifted is answered better on Now and Food, while what only a calendar can answer is
 what kind of day this was and when you last did it. Each square carries three fixed-order rows,
 read in the order a day is built: whether you **weighed in**, then movement patterns
 (push · pull · legs · core · cardio), then the three anchor meals. Position is the encoding, so
@@ -282,7 +282,7 @@ The weigh-in row is one bar spanning the whole square rather than a strip of slo
 is only ever one weigh-in and nothing for it to hold a position against. An unweighed day keeps
 the empty track, so the two rows below never shift up and one square's silhouette stays
 comparable with another's. The number itself is never shown: a weight in a 48px box is a
-magnitude with nothing beside it to compare against, and the day page and Today's chart both
+magnitude with nothing beside it to compare against, and the day page and the Now screen's chart both
 already answer that. It also means a day with *only* a weigh-in is no longer a lit, tappable
 square with nothing on it.
 
@@ -304,7 +304,7 @@ rather than on the muscle: **the pattern is a property of the movement**.
 
 Five patterns own a colour and a calendar slot; anything else — sports, mobility — falls into
 `other`, shown as "Sport & other" in neutral ink. It appears as a ROW wherever there is one
-(Today's volume, last-trained, the coverage matrix) but gets no square slot, since the squares
+(last-trained, the coverage matrix) but gets no square slot, since the squares
 are legible at 6px only because five positions never change. `PATTERNS` and `PATTERN_ROWS` in
 `web/src/lib/patterns.ts` are that distinction. A bench press is a
 push even though triceps do real work; a curl is a pull even though it is the same arm.

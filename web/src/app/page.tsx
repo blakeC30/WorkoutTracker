@@ -31,7 +31,7 @@ const COVERAGE_DAYS = 28;
  * then a line of small numbers. Four identical blocks would be wallpaper — the eye needs to
  * be told what the focal point is, and here it is bodyweight.
  */
-export default async function Today() {
+export default async function Now() {
   // Fetched together rather than in sequence; four round trips to Vercel add up on cellular.
   const [weight, coverage, nutrition, review, recency] = await Promise.all([
     getBodyweight(90),
@@ -97,7 +97,7 @@ export default async function Today() {
  * How many foods are still running on estimated macros.
  *
  * Built like every other block on this screen — a Section label, one mono figure, a caption —
- * rather than the lone sans-serif list row it used to be, which was the only thing on Today
+ * rather than the lone sans-serif list row it used to be, which was the only thing on Now
  * that did not look like the rest of the app.
  */
 function Review({ rows }: { rows: FoodRow[] }) {
@@ -171,7 +171,16 @@ function Fuel({ result }: { result: Awaited<ReturnType<typeof getNutrition>> }) 
   const total = split.reduce((sum, m) => sum + m.kcal, 0);
 
   return (
-    <Section label="Fuel" aside={`${row.items} item${row.items === 1 ? '' : 's'}`}>
+    /*
+     * "Today" leads the aside, and it is not decoration.
+     *
+     * Every other section on this screen reads a window — 28 days of coverage, 90 of bodyweight
+     * — and this one reads a single day. It used to say so only when the day was EMPTY: with
+     * food logged the aside became "3 items" and nothing on screen said the calories above it
+     * were today's rather than an average or a total. The one section actually scoped to the day
+     * was the one that stopped mentioning it as soon as it had something to report.
+     */
+    <Section label="Fuel" aside={`Today · ${row.items} item${row.items === 1 ? '' : 's'}`}>
       <Figure value={int(n(row.calories))} unit="KCAL" count={n(row.calories)} />
 
       {total > 0 ? (
