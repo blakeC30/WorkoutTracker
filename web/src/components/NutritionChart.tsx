@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import type { NutritionRow } from '@/lib/backend';
 import { Swatch } from '@/components/ui';
-import { macroColor } from '@/lib/macros';
+import { MACROS, macroColor } from '@/lib/macros';
 import { useScrubGesture } from '@/lib/useScrubGesture';
 import { dec, int, shortDay } from '@/lib/format';
 import { nowInAppTz } from '@/lib/time';
@@ -155,10 +155,22 @@ export function NutritionChart({ rows, days = 30 }: { rows: NutritionRow[]; days
         </div>
         <div className="mono" style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', textAlign: 'right' }}>
           {point.logged ? (
+            /* Driven off MACROS rather than three hard-coded letters, so this readout carries
+               the same tones as the split bar on Now and the day page, and the P/C/F in the
+               food list below it. All three used to inherit the container's --ink-dim and read
+               as one grey block, which made the one place you scrub a day's macros the only
+               place in the app where they were not colour-coded.
+
+               The letter is tinted and the number is not, the same way `Macros` does it in the
+               food list: three differently lit numbers in a stack read as three states rather
+               than three quantities. */
             <>
-              <div>{point.protein} P</div>
-              <div>{point.carbs} C</div>
-              <div>{point.fat} F</div>
+              {MACROS.map((m) => (
+                <div key={m.key}>
+                  {point[m.key]}
+                  <span style={{ color: m.color, marginLeft: 3 }}>{m.short}</span>
+                </div>
+              ))}
             </>
           ) : (
             <div style={{ color: 'var(--ink-faint)' }}>Not logged</div>
