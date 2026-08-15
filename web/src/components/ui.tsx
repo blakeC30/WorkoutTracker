@@ -331,10 +331,26 @@ export function MacroBar({
 
   return (
     <div style={{ display: 'flex', height: 8, marginTop: 16, gap: 2 }}>
-      {split.map((m) => (
+      {split.map((m, index) => (
         // flex-basis 0 with a grow factor, so the widths are the proportions exactly rather
         // than the proportions plus whatever the content would have been.
-        <div key={m.key} style={{ flex: `${(m.kcal / total) * 100} 0 0`, background: m.color }} />
+        <div
+          key={m.key}
+          // Each segment draws out from its own left edge, in macro order, rather than the
+          // whole strip wiping across as one. The bar is always full width, so a single sweep
+          // would animate a length that means nothing; three staggered fills animate the split,
+          // which is the only thing here that carries a reading. The stagger is wider than the
+          // 25ms used on the coverage grids because there are three segments, not fifteen —
+          // at that spacing these would read as one blur instead of three quantities.
+          className="draw-x"
+          style={
+            {
+              flex: `${(m.kcal / total) * 100} 0 0`,
+              background: m.color,
+              '--delay': `${index * 90}ms`,
+            } as React.CSSProperties
+          }
+        />
       ))}
     </div>
   );
