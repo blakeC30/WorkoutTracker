@@ -31,16 +31,6 @@ export function shortDay(iso: string): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
-/** ISO week number, for the header. */
-export function isoWeek(d: Date): number {
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  // Thursday of this week determines the year the week belongs to.
-  target.setDate(target.getDate() + 3 - ((target.getDay() + 6) % 7));
-  const firstThursday = new Date(target.getFullYear(), 0, 4);
-  firstThursday.setDate(firstThursday.getDate() + 3 - ((firstThursday.getDay() + 6) % 7));
-  return 1 + Math.round((target.getTime() - firstThursday.getTime()) / (7 * 86_400_000));
-}
-
 /** Whole number with thousands separators: 83265 -> '83,265'. */
 export function int(value: number | null): string {
   if (value === null) return '—';

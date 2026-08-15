@@ -5,7 +5,7 @@ import { WeightChart } from '@/components/WeightChart';
 import { Coverage } from '@/components/Coverage';
 import { PATTERN_ROWS, patternColor, patternLabel } from '@/lib/patterns';
 import { MACROS } from '@/lib/macros';
-import { agoLabel, dayLabel, int, isoWeek, toIso } from '@/lib/format';
+import { agoLabel, dayLabel, int, toIso } from '@/lib/format';
 import { nowInAppTz, todayInAppTz } from '@/lib/time';
 import { signOut } from '@/app/login/actions';
 import Link from 'next/link';
@@ -34,7 +34,7 @@ export default async function Now() {
 
   return (
     <main className="screen">
-      <Masthead left={dayLabel(toIso(now))} right={`WK ${isoWeek(now)}`} />
+      <Masthead left={dayLabel(toIso(now))} />
 
       {/* Sections are raised into place as they come into view, each a beat after the last.
           The delays are small on purpose — this is a screen you check for five seconds, so the
@@ -229,20 +229,15 @@ function Ready({ result }: { result: Awaited<ReturnType<typeof getRecency>> }) {
    * was being spent on a ranking that the numbers already state.
    *
    * Nothing about urgency is lost. The day count is the reading, and overdue columns are
-   * flagged by colour and counted in the aside.
+   * flagged by colour.
    */
   const byPattern = new Map(result.rows.map((r) => [r.pattern, r]));
   const ordered = PATTERN_ROWS.map((p) => byPattern.get(p.key)).filter(
     (row): row is RecencyRow => row !== undefined,
   );
 
-  const overdue = ordered.filter((r) => r.days_since === null || r.days_since >= 7);
-
   return (
-    <Section
-      label="Last trained"
-      aside={overdue.length > 0 ? `${overdue.length} over a week` : 'all within a week'}
-    >
+    <Section label="Last trained">
       <div style={{ display: 'flex', gap: 10 }}>
         {ordered.map((row) => (
           <Gap key={row.pattern} row={row} />
