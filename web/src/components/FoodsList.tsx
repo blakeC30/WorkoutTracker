@@ -130,6 +130,12 @@ export function FoodsList({ rows, capped }: { rows: FoodRow[]; capped: boolean }
 
 function Item({ row }: { row: FoodRow }) {
   const estimated = isEstimated(row);
+  // --flag is reserved for the two states worth correcting: a food with no macros at all, and
+  // one the model itself called low confidence. Medium is still marked estimated by the word in
+  // the row but reads in the row's own ink — it is the ordinary state of a catalogued food, and
+  // a colour carried by most of the list stops meaning "check this". Same rule the day page
+  // applies to its meal rows.
+  const unsure = row.calories === null || row.confidence === 'low';
 
   return (
     <div style={{ padding: '12px 0', borderTop: '1px solid var(--rule)' }}>
@@ -143,7 +149,7 @@ function Item({ row }: { row: FoodRow }) {
           </span>
           <span
             className="mono"
-            style={{ fontSize: 'var(--t-base)', flexShrink: 0, color: estimated ? 'var(--flag)' : 'var(--ink)' }}
+            style={{ fontSize: 'var(--t-base)', flexShrink: 0, color: unsure ? 'var(--flag)' : 'var(--ink)' }}
           >
             {row.calories === null ? '—' : int(n(row.calories))}
             <span style={{ fontSize: 'var(--t-cap)', color: 'var(--ink-dim)', marginLeft: 3 }}>KCAL</span>
@@ -162,7 +168,7 @@ function Item({ row }: { row: FoodRow }) {
           </span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
             {estimated ? (
-              <span style={{ color: 'var(--flag)' }}>
+              <span style={unsure ? { color: 'var(--flag)' } : undefined}>
                 {row.calories === null ? 'no macros' : row.confidence}
               </span>
             ) : null}
