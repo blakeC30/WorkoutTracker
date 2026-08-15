@@ -219,16 +219,6 @@ export type RecencyRow = {
 
 export const getRecency = () => query<RecencyRow>('/api/stats/recency');
 
-/** Training days per calendar month — the only reading in the app that looks past 30 days. */
-export type MonthRow = {
-  month: string;
-  training_days: number;
-  /** Days of that month that have happened, so a running month is not read as a collapse. */
-  days_elapsed: number;
-};
-
-export const getMonths = (months = 6) => query<MonthRow>('/api/stats/months', { months });
-
 /**
  * Training by pattern. No fan-out here — pattern is one column on the exercise.
  *

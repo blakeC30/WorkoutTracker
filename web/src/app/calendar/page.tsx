@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { getCalendar, getMonths, n, n0, type CalendarRow } from '@/lib/backend';
+import { getCalendar, n, n0, type CalendarRow } from '@/lib/backend';
 import { Masthead, Section, Rule, Empty, Fault } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { PATTERNS, PATTERN_ROWS, patternLabel } from '@/lib/patterns';
-import { Consistency } from '@/components/Consistency';
 import { dec, monthKey, monthShape, shiftMonth, today } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +28,7 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
   const key = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : monthKey(today());
   const shape = monthShape(key);
 
-  const [result, months] = await Promise.all([getCalendar(shape.from, shape.to), getMonths(6)]);
+  const result = await getCalendar(shape.from, shape.to);
 
   return (
     <main className="screen">
@@ -57,17 +56,6 @@ export default async function Calendar({ searchParams }: { searchParams: Promise
           <Reveal delay={180}>
             <Totals rows={result.rows} monthKey={key} />
           </Reveal>
-
-          {/* The one block on this page that is not scoped to the month above it. Everything
-              else here answers "how was August"; this answers "is the habit holding up". */}
-          {months.ok ? (
-            <>
-              <Rule />
-              <Reveal delay={240}>
-                <Consistency rows={months.rows} />
-              </Reveal>
-            </>
-          ) : null}
         </>
       ) : (
         <Fault error={result.error} />
@@ -421,7 +409,7 @@ function Matrix({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
  *
  * The volume, cardio and calorie totals that used to live here were a straight duplicate of the
  * eight-week ledger further down the same screen. What is left is the coverage question — days
- * trained and days fed, against days elapsed — which nothing else reports.
+ * trained, days fed and days weighed, against days elapsed — which nothing else reports.
  */
 function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string }) {
   if (rows.length === 0) {
@@ -442,9 +430,16 @@ function Totals({ rows, monthKey: key }: { rows: CalendarRow[]; monthKey: string
 
   return (
     <Section label="Month" aside={`${elapsed} days so far`}>
-      <div style={{ display: 'flex', gap: 26 }}>
+      {/* Two columns rather than one row. Four of these will not fit across 350px — the labels
+          alone run past it at 11px with the cap tracking — and the pairing the grid produces is
+          the right one anyway: the three coverage counts read down the left and across, and the
+          only stat here that is not a count of days sits last. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 26px' }}>
         <Stat label="Trained" value={`${trained}`} unit={`/ ${elapsed}`} />
         <Stat label="Food logged" value={`${fed}`} unit={`/ ${elapsed}`} />
+        {/* Sits next to the change below it on purpose: a month with four weigh-ins makes that
+            figure nearly meaningless, and the count is the only thing that says so. */}
+        <Stat label="Weighed in" value={`${weighed.length}`} unit={`/ ${elapsed}`} />
         {/* No tone. The sign in front of the number already says which way it went, and
             colouring the direction made a month of gaining read as an error and a month of
             losing read as a reward — a judgement this screen has no business making. */}
